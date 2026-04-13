@@ -1,0 +1,352 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { Users, FileText, Lock, ArrowLeft, ShieldCheck, QrCode, Trash2 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
+import StudentManager from './components/StudentManager';
+import SociogramNetwork from './components/SociogramNetwork';
+import InsightsDashboard from './components/InsightsDashboard';
+import SurveyForm from './components/SurveyForm';
+
+function App() {
+  const [view, setView] = useState('home'); // 'home' | 'teacher' | 'survey'
+  const [showQR, setShowQR] = useState(false);
+  const [adminPassword, setAdminPassword] = useState(() => {
+    return localStorage.getItem('sociogram_admin_pw') || '0000';
+  });
+  
+  const [students, setStudents] = useState(() => {
+    const saved = localStorage.getItem('sociogram_students');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [responses, setResponses] = useState(() => {
+    const saved = localStorage.getItem('sociogram_responses');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [surveyHistory, setSurveyHistory] = useState(() => {
+    const saved = localStorage.getItem('sociogram_history');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [activeHistoryId, setActiveHistoryId] = useState('current');
+
+  useEffect(() => {
+    localStorage.setItem('sociogram_students', JSON.stringify(students));
+  }, [students]);
+
+  useEffect(() => {
+    localStorage.setItem('sociogram_responses', JSON.stringify(responses));
+  }, [responses]);
+
+  useEffect(() => {
+    localStorage.setItem('sociogram_history', JSON.stringify(surveyHistory));
+  }, [surveyHistory]);
+
+  const addStudent = (name) => {
+    if (!name.trim()) return;
+    const newStudent = { id: Date.now().toString(), name: name.trim() };
+    setStudents([...students, newStudent]);
+  };
+
+  const addMultipleStudents = (names) => {
+    const validNames = names.filter(name => name && name.trim());
+    if (validNames.length === 0) return;
+    
+    const newStudents = validNames.map((name, idx) => ({
+      id: (Date.now() + idx).toString(),
+      name: name.trim()
+    }));
+    
+    setStudents(prev => [...prev, ...newStudents]);
+  };
+
+  const removeStudent = (id) => {
+    setStudents(students.filter(s => s.id !== id));
+    setResponses(responses.filter(r => r.authorId !== id).map(r => ({
+      ...r,
+      q1: r.q1.filter(x => x !== id),
+      q2: r.q2.filter(x => x !== id),
+      q3: r.q3.filter(x => x !== id),
+      q4: r.q4.filter(x => x !== id),
+      q5: r.q5.filter(x => x !== id)
+    })));
+  };
+
+  const handleSurveySubmit = (surveyData) => {
+    const newResponses = responses.filter(r => r.authorId !== surveyData.authorId);
+    setResponses([...newResponses, surveyData]);
+    setView('home'); // Return to Home Gateway after submit
+  };
+
+  const activeResponses = activeHistoryId === 'current' 
+    ? responses 
+    : (surveyHistory.find(h => h.id === activeHistoryId)?.responses || []);
+
+  const activeStudents = activeHistoryId === 'current'
+    ? students
+    : (surveyHistory.find(h => h.id === activeHistoryId)?.students || []);
+
+  const relationships = useMemo(() => {
+    const rels = [];
+    activeResponses.forEach(r => {
+      r.q4.forEach(targetId => {
+        rels.push({ id: `rel_${r.authorId}_${targetId}_pos`, source: r.authorId, target: targetId, type: 'positive' });
+      });
+      r.q5.forEach(targetId => {
+        rels.push({ id: `rel_${r.authorId}_${targetId}_neg`, source: r.authorId, target: targetId, type: 'negative' });
+      });
+    });
+    return rels;
+  }, [activeResponses]);
+
+  const handleCloseSurvey = () => {
+    const today = new Date();
+    const defaultTitle = `${today.getMonth() + 1}월 ${today.getDate()}일 설문 마감`;
+    const title = prompt('마감할 설문의 제목(또는 마감일)을 입력하세요.', defaultTitle);
+    
+    if (title) {
+      const newHistory = {
+        id: Date.now().toString(),
+        title: title,
+        responses: [...responses],
+        students: [...students]
+      };
+      setSurveyHistory([...surveyHistory, newHistory]);
+      setResponses([]); // 리셋
+      alert('설문이 마감되고 결과가 저장되었습니다. 과거 기록에서 열람할 수 있습니다.');
+    }
+  };
+
+  const handleRemoveHistory = (e, idToDelete) => {
+    e.stopPropagation();
+    if (window.confirm('이 과거 설문 기록을 정말로 삭제하시겠습니까?\n(삭제 후에는 복구할 수 없습니다)')) {
+      if (activeHistoryId === idToDelete) {
+        setActiveHistoryId('current');
+      }
+      setSurveyHistory(surveyHistory.filter(h => h.id !== idToDelete));
+    }
+  };
+
+  const handleTeacherAccess = () => {
+    const isInitial = adminPassword === '0000';
+    const pwPrompt = isInitial 
+      ? '교사용 페이지입니다. 비밀번호를 입력하세요. (초기 비밀번호: 0000)'
+      : '교사용 페이지입니다. 비밀번호를 입력하세요.';
+      
+    const password = prompt(pwPrompt);
+    if (password === adminPassword) {
+      setView('teacher');
+    } else if (password !== null) {
+      alert('비밀번호가 틀렸습니다.');
+    }
+  };
+
+  const handleChangePassword = () => {
+    const currentPw = prompt('현재 비밀번호를 입력하세요.');
+    if (currentPw === adminPassword) {
+      const newPw = prompt('새로운 비밀번호를 입력하세요.');
+      if (newPw) {
+        setAdminPassword(newPw);
+        localStorage.setItem('sociogram_admin_pw', newPw);
+        alert('비밀번호가 변경되었습니다.');
+      }
+    } else if (currentPw !== null) {
+      alert('현재 비밀번호가 틀렸습니다.');
+    }
+  };
+
+  // HOME GATEWAY VIEW
+  if (view === 'home') {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--background)', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+        
+        <button 
+          onClick={() => setShowQR(true)}
+          style={{ position: 'absolute', top: '2rem', right: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'white', padding: '0.75rem 1.25rem', borderRadius: '12px', cursor: 'pointer', border: '1px solid var(--border)', boxShadow: 'var(--shadow-md)', color: 'var(--text-main)', fontWeight: 'bold' }}
+        >
+          <QrCode size={20} color="var(--primary)" />
+          학생 접속용 QR코드 
+        </button>
+
+        {showQR && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }} onClick={() => setShowQR(false)}>
+            <div style={{ background: 'white', padding: '3rem', borderRadius: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: 'var(--shadow-xl)', gap: '1.5rem', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+              <h2 style={{margin: 0, color: 'var(--text-main)'}}>학생 접속용 QR 코드</h2>
+              <p style={{margin: 0, color: 'var(--text-muted)'}}>참여할 학생들에게 이 화면의 QR코드를 스캔하도록 안내해 주세요.</p>
+              <div style={{ padding: '1.5rem', background: 'white', borderRadius: '16px', border: '1px solid var(--border)', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}>
+                <QRCodeSVG value={window.location.href} size={250} />
+              </div>
+              <p style={{margin: 0, fontSize: '0.85rem', color: '#6b7280', wordBreak: 'break-all', maxWidth: '300px'}}>{window.location.href}</p>
+              <button 
+                onClick={() => setShowQR(false)} 
+                className="btn btn-primary"
+                style={{ width: '100%', marginTop: '1rem', padding: '0.75rem' }}
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
+          <h1 style={{ fontSize: '2.5rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '1rem', marginBottom: '1rem' }}>
+            <Users size={40} />
+            학급 교우 관계 분석기
+          </h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>학생 설문에 참여하거나 교사용 결과 대시보드로 이동하세요.</p>
+        </div>
+
+        <div style={{ display: 'flex', gap: '2rem' }}>
+          <div 
+            onClick={() => setView('survey')}
+            style={{
+              background: 'white', padding: '3rem 4rem', borderRadius: '24px', boxShadow: 'var(--shadow-lg)', cursor: 'pointer',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', transition: 'transform 0.2s', width: '300px'
+            }}
+            onMouseOver={e => e.currentTarget.style.transform = 'translateY(-5px)'}
+            onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}
+          >
+            <div style={{ background: '#EEF2FF', padding: '1.5rem', borderRadius: '50%', color: 'var(--primary)' }}>
+              <FileText size={48} />
+            </div>
+            <h2 style={{ fontSize: '1.5rem', margin: 0 }}>학생용</h2>
+            <p style={{ color: 'var(--text-muted)', textAlign: 'center', margin: 0 }}>나의 교우 관계와 솔직한 생각을 설문에 작성합니다.</p>
+          </div>
+
+          <div 
+            onClick={handleTeacherAccess}
+            style={{
+              background: 'white', padding: '3rem 4rem', borderRadius: '24px', boxShadow: 'var(--shadow-lg)', cursor: 'pointer',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', transition: 'transform 0.2s', width: '300px'
+            }}
+            onMouseOver={e => e.currentTarget.style.transform = 'translateY(-5px)'}
+            onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}
+          >
+            <div style={{ background: '#FEF2F2', padding: '1.5rem', borderRadius: '50%', color: 'var(--danger)' }}>
+              <ShieldCheck size={48} />
+            </div>
+            <h2 style={{ fontSize: '1.5rem', margin: 0 }}>교사용</h2>
+            <p style={{ color: 'var(--text-muted)', textAlign: 'center', margin: 0 }}>설문 결과를 바탕으로 관계도와 통계를 분석합니다.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // SURVEY VIEW
+  if (view === 'survey') {
+    return (
+      <div style={{ background: '#f3f4f6' }}>
+        <SurveyForm 
+          students={students} 
+          responses={responses}
+          onSubmit={handleSurveySubmit} 
+          onCancel={() => setView('home')} 
+        />
+      </div>
+    );
+  }
+
+  // TEACHER DASHBOARD VIEW
+  return (
+    <div className="app-container">
+      <header className="header">
+        <h1>
+          <Users size={28} />
+          {activeHistoryId === 'current' 
+            ? `${new Date().getMonth() + 1}월 ${new Date().getDate()}일 현재 교우 관계 분석` 
+            : `과거 기록: ${surveyHistory.find(h => h.id === activeHistoryId)?.title || '알 수 없음'}`}
+        </h1>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <button className="btn" style={{ background: 'var(--background)', border: '1px solid var(--border)' }} onClick={handleChangePassword}>
+            <Lock size={18} />
+            비밀번호 변경
+          </button>
+          <button className="btn" style={{ background: 'var(--background)', border: '1px solid var(--border)' }} onClick={() => setView('home')}>
+            <ArrowLeft size={18} />
+            처음 화면으로
+          </button>
+        </div>
+      </header>
+      
+      <main className="main-content">
+        <aside className="sidebar">
+          {activeHistoryId === 'current' ? (
+            <StudentManager 
+              students={students} 
+              onAdd={addStudent} 
+              onAddMultiple={addMultipleStudents}
+              onRemove={removeStudent} 
+            />
+          ) : (
+            <div className="panel-section">
+              <h2 className="panel-title">설문 잠김</h2>
+              <p style={{fontSize: '0.85rem', color: 'var(--text-muted)'}}>과거 기록을 열람 중입니다. 명단을 수정할 수 없습니다.</p>
+            </div>
+          )}
+          
+          <div className="panel-section" style={{ borderBottom: 'none' }}>
+            <h2 className="panel-title">과거 설문 기록</h2>
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <li 
+                style={{ padding: '0.5rem', background: activeHistoryId === 'current' ? 'var(--primary)' : '#f3f4f6', color: activeHistoryId === 'current' ? 'white' : 'var(--text-main)', borderRadius: '8px', cursor: 'pointer', fontSize: '0.9rem' }}
+                onClick={() => setActiveHistoryId('current')}
+              >
+                진행 중인 설문
+              </li>
+              {surveyHistory.map(h => (
+                <li 
+                  key={h.id}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem', background: activeHistoryId === h.id ? 'var(--primary)' : '#f3f4f6', color: activeHistoryId === h.id ? 'white' : 'var(--text-main)', borderRadius: '8px', cursor: 'pointer', fontSize: '0.9rem' }}
+                  onClick={() => setActiveHistoryId(h.id)}
+                >
+                  <span style={{overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>{h.title}</span>
+                  <button 
+                    className="btn-icon" 
+                    style={{ padding: '0.2rem', color: activeHistoryId === h.id ? 'rgba(255,255,255,0.8)' : '#9ca3af' }}
+                    onClick={(e) => handleRemoveHistory(e, h.id)}
+                    title="기록 삭제"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+          
+          {activeHistoryId === 'current' && (
+            <div className="panel-section" style={{ borderBottom: 'none', borderTop: '1px solid var(--border)' }}>
+              <button 
+                className="btn" 
+                style={{ width: '100%', background: '#dc2626', color: 'white', border: 'none' }}
+                onClick={handleCloseSurvey}
+              >
+                현재 설문 마감 및 저장
+              </button>
+              <p style={{fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.5rem', textAlign: 'center'}}>
+                설문을 마감하면 결과가 저장되고 응답이 초기화됩니다.
+              </p>
+            </div>
+          )}
+        </aside>
+        
+        <section className="graph-area">
+          <SociogramNetwork 
+            students={activeStudents} 
+            relationships={relationships} 
+          />
+        </section>
+        
+        <aside className="dashboard-panel">
+          <InsightsDashboard 
+            students={activeStudents} 
+            relationships={relationships} 
+            responses={activeResponses}
+          />
+        </aside>
+      </main>
+    </div>
+  );
+}
+
+export default App;
