@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Users, FileText, Lock, ArrowLeft, ShieldCheck, QrCode, Trash2 } from 'lucide-react';
+import { Users, FileText, Lock, ArrowLeft, ShieldCheck, QrCode, Trash2, Link2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import StudentManager from './components/StudentManager';
 import SociogramNetwork from './components/SociogramNetwork';
 import InsightsDashboard from './components/InsightsDashboard';
 import SurveyForm from './components/SurveyForm';
+import { decodeRosterFromLocation, buildStudentAccessUrl, stripRosterFromAddressBar } from './utils/rosterUrl';
 
 function App() {
   const [view, setView] = useState('home'); // 'home' | 'teacher' | 'survey'
@@ -14,8 +15,19 @@ function App() {
   });
   
   const [students, setStudents] = useState(() => {
-    const saved = localStorage.getItem('sociogram_students');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      /** 다른 기기(학생 폰)에서는 localStorage가 비어 있음 → 주소의 명단(#r=) 우선 */
+      const fromUrl = decodeRosterFromLocation();
+      if (fromUrl?.length) return fromUrl;
+    } catch (_) {
+      /* ignore */
+    }
+    try {
+      const saved = localStorage.getItem('sociogram_students');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
   });
 
   const [responses, setResponses] = useState(() => {
@@ -41,6 +53,11 @@ function App() {
   useEffect(() => {
     localStorage.setItem('sociogram_history', JSON.stringify(surveyHistory));
   }, [surveyHistory]);
+
+  /** 명단을 주소에 실어 들어온 경우 로드 후 긴 해시 제거 */
+  useEffect(() => {
+    stripRosterFromAddressBar();
+  }, []);
 
   const addStudent = (name) => {
     if (!name.trim()) return;
@@ -198,20 +215,46 @@ function App() {
 
         {showQR && (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }} onClick={() => setShowQR(false)}>
-            <div style={{ background: 'white', padding: '3rem', borderRadius: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: 'var(--shadow-xl)', gap: '1.5rem', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-              <h2 style={{margin: 0, color: 'var(--text-main)'}}>학생 접속용 QR 코드</h2>
-              <p style={{margin: 0, color: 'var(--text-muted)'}}>참여할 학생들에게 이 화면의 QR코드를 스캔하도록 안내해 주세요.</p>
+            <div style={{ background: 'white', padding: '3rem', borderRadius: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: 'var(--shadow-xl)', gap: '1.5rem', textAlign: 'center', maxWidth: '420px' }} onClick={e => e.stopPropagation()}>
+              <h2 style={{ margin: 0, color: 'var(--text-main)' }}>학생 접속용 QR 코드</h2>
+              {students.length === 0 ? (
+                <p style={{ margin: 0, color: 'var(--danger)', fontSize: '0.95rem', lineHeight: 1.5 }}>
+                  아직 이 브라우저에 학생 명단이 없습니다. 먼저 <strong>교사용</strong>에서 명단을 등록한 뒤, 처음 화면으로 돌아와 QR을 다시 여세요. (명단은 QR·링크에 포함되어 학생 기기로 전달됩니다.)
+                </p>
+              ) : (
+                <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.5 }}>
+                  이 QR과 주소에는 현재 등록된 학생 이름이 포함되어 있습니다. 학생이 스캔하면 <strong>내 이름은?</strong> 목록에 이름이 보입니다.
+                </p>
+              )}
               <div style={{ padding: '1.5rem', background: 'white', borderRadius: '16px', border: '1px solid var(--border)', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}>
-                <QRCodeSVG value={window.location.href} size={250} />
+                <QRCodeSVG value={buildStudentAccessUrl(students)} size={250} level="M" />
               </div>
-              <p style={{margin: 0, fontSize: '0.85rem', color: '#6b7280', wordBreak: 'break-all', maxWidth: '300px'}}>{window.location.href}</p>
-              <button 
-                onClick={() => setShowQR(false)} 
-                className="btn btn-primary"
-                style={{ width: '100%', marginTop: '1rem', padding: '0.75rem' }}
-              >
-                닫기
-              </button>
+              <p style={{ margin: 0, fontSize: '0.8rem', color: '#6b7280', wordBreak: 'break-all', maxWidth: '100%' }}>{buildStudentAccessUrl(students)}</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%' }}>
+                <button
+                  type="button"
+                  className="btn"
+                  style={{ width: '100%', padding: '0.65rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)' }}
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(buildStudentAccessUrl(students));
+                      alert(students.length ? '명단이 포함된 주소를 복사했습니다. 카톡 등으로 학생에게 보내도 됩니다.' : '주소를 복사했습니다. 교사용에서 명단을 넣은 뒤 다시 복사하세요.');
+                    } catch {
+                      alert('복사에 실패했습니다. 주소를 길게 눌러 직접 복사해 주세요.');
+                    }
+                  }}
+                >
+                  <Link2 size={16} />
+                  명단 포함 링크 복사
+                </button>
+                <button
+                  onClick={() => setShowQR(false)}
+                  className="btn btn-primary"
+                  style={{ width: '100%', padding: '0.75rem' }}
+                >
+                  닫기
+                </button>
+              </div>
             </div>
           </div>
         )}
