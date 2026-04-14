@@ -164,7 +164,7 @@ export default function SociogramNetwork({ students, relationships, responses = 
         source: String(r.source),
         target: String(r.target),
         type: r.type,
-        color: r.type === 'positive' ? '#10B981' : '#F59E0B',
+        color: r.type === 'positive' ? '#10B981' : '#EF4444',
       }))
       /** 존재하지 않는 노드를 가리키는 링크는 시뮬레이션·줌을 깨뜨릴 수 있음 */
       .filter((l) => nodeIdSet.has(l.source) && nodeIdSet.has(l.target));
@@ -346,7 +346,7 @@ export default function SociogramNetwork({ students, relationships, responses = 
                   width: 10,
                   height: 10,
                   borderRadius: '50%',
-                  background: '#F59E0B',
+                  background: '#EF4444',
                   display: 'inline-block',
                   verticalAlign: 'middle',
                   marginLeft: '0.25rem',
