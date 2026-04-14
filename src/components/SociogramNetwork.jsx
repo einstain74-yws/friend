@@ -82,6 +82,8 @@ function getDefaultGraphSize() {
 
 export default function SociogramNetwork({ students, relationships, responses = [], snapshotKey = 'current' }) {
   const fgRef = useRef();
+  /** react-kapsule ref에는 graphData()가 없음 — paintLabels에서 fg.graphData() 호출 시 매 프레임 throw → rAF 루프 중단 */
+  const graphDataRef = useRef({ nodes: [], links: [] });
   const [dimensions, setDimensions] = useState(getDefaultGraphSize);
   const containerRef = useRef();
 
@@ -170,6 +172,8 @@ export default function SociogramNetwork({ students, relationships, responses = 
     return { nodes, links };
   }, [students, relationships, responses]);
 
+  graphDataRef.current = graphData;
+
   useEffect(() => {
     if (!fgRef.current || graphData.nodes.length === 0) return;
     const t = window.setTimeout(() => {
@@ -180,18 +184,15 @@ export default function SociogramNetwork({ students, relationships, responses = 
     return () => window.clearTimeout(t);
   }, [graphData, snapshotKey, dimensions.width, dimensions.height]);
 
-  const paintLabels = useCallback(
-    (ctx, globalScale) => {
-      const fg = fgRef.current;
-      if (!fg) return;
-      const { nodes } = fg.graphData();
+  const paintLabels = useCallback((ctx, globalScale) => {
+    try {
+      const { nodes } = graphDataRef.current || { nodes: [] };
       const gs = globalScale || 1;
       ctx.save();
       nodes.forEach((node) => {
         if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) return;
         const label = String(node.name || '');
         if (!label) return;
-        const st = getAgreeablenessStyle(node.q9);
         let fontSize = 13 / gs;
         fontSize = Math.max(8, Math.min(56, fontSize));
         ctx.font = `600 ${fontSize}px system-ui, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif`;
@@ -207,9 +208,10 @@ export default function SociogramNetwork({ students, relationships, responses = 
         ctx.fillText(label, node.x, labelY);
       });
       ctx.restore();
-    },
-    []
-  );
+    } catch (e) {
+      console.error('paintLabels:', e);
+    }
+  }, []);
 
   const downloadPDF = async () => {
     if (!containerRef.current) return;
