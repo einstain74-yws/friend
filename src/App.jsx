@@ -72,6 +72,34 @@ function App() {
     })));
   };
 
+  const clearAllStudents = () => {
+    setStudents([]);
+    setResponses([]);
+  };
+
+  /** 과거 기록 보다가 '진행 중인 설문'으로 올 때, 명단을 가장 최근 마감 스냅샷 기준으로 맞춤 */
+  const handleSelectCurrentSurvey = () => {
+    if (activeHistoryId !== 'current' && surveyHistory.length > 0) {
+      const latest = surveyHistory[surveyHistory.length - 1];
+      const nextStudents = latest.students.map((s) => ({ ...s }));
+      setStudents(nextStudents);
+      const validIds = new Set(nextStudents.map((s) => s.id));
+      setResponses((prev) =>
+        prev
+          .filter((r) => validIds.has(r.authorId))
+          .map((r) => ({
+            ...r,
+            q1: r.q1.filter((id) => validIds.has(id)),
+            q2: r.q2.filter((id) => validIds.has(id)),
+            q3: r.q3.filter((id) => validIds.has(id)),
+            q4: r.q4.filter((id) => validIds.has(id)),
+            q5: r.q5.filter((id) => validIds.has(id)),
+          }))
+      );
+    }
+    setActiveHistoryId('current');
+  };
+
   const handleSurveySubmit = (surveyData) => {
     const newResponses = responses.filter(r => r.authorId !== surveyData.authorId);
     setResponses([...newResponses, surveyData]);
@@ -276,7 +304,8 @@ function App() {
               students={students} 
               onAdd={addStudent} 
               onAddMultiple={addMultipleStudents}
-              onRemove={removeStudent} 
+              onRemove={removeStudent}
+              onClearAll={clearAllStudents}
             />
           ) : (
             <div className="panel-section">
@@ -290,7 +319,7 @@ function App() {
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <li 
                 style={{ padding: '0.5rem', background: activeHistoryId === 'current' ? 'var(--primary)' : '#f3f4f6', color: activeHistoryId === 'current' ? 'white' : 'var(--text-main)', borderRadius: '8px', cursor: 'pointer', fontSize: '0.9rem' }}
-                onClick={() => setActiveHistoryId('current')}
+                onClick={handleSelectCurrentSurvey}
               >
                 진행 중인 설문
               </li>

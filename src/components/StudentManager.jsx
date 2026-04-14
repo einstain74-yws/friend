@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { UserPlus, Trash2, Upload } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
-export default function StudentManager({ students, onAdd, onAddMultiple, onRemove }) {
+export default function StudentManager({ students, onAdd, onAddMultiple, onRemove, onClearAll }) {
   const [name, setName] = useState('');
   const fileInputRef = useRef(null);
 
@@ -50,21 +50,41 @@ export default function StudentManager({ students, onAdd, onAddMultiple, onRemov
     e.target.value = null;
   };
 
+  const handleClearAll = () => {
+    if (students.length === 0) return;
+    if (!window.confirm('등록된 학생을 모두 삭제하시겠습니까?\n진행 중인 설문 응답도 함께 삭제됩니다.')) return;
+    onClearAll();
+  };
+
   return (
     <div className="panel-section">
       <h2 className="panel-title">학생 명단 관리</h2>
       
-      <form onSubmit={handleSubmit} className="input-group">
+      <form onSubmit={handleSubmit}>
         <input 
           type="text" 
           placeholder="학생 이름 입력" 
           value={name}
           onChange={(e) => setName(e.target.value)}
+          style={{ width: '100%', marginBottom: '0.5rem' }}
         />
-        <button type="submit" className="btn btn-primary" disabled={!name.trim()}>
-          <UserPlus size={18} />
-          추가
-        </button>
+        <div className="input-group">
+          <button type="submit" className="btn btn-primary" disabled={!name.trim()} style={{ flex: 1 }}>
+            <UserPlus size={18} />
+            추가
+          </button>
+          <button
+            type="button"
+            className="btn"
+            style={{ flex: 1, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--danger)' }}
+            onClick={handleClearAll}
+            disabled={students.length === 0}
+            title="명단 전체 삭제"
+          >
+            <Trash2 size={18} />
+            일괄 삭제
+          </button>
+        </div>
       </form>
 
       <div style={{ marginTop: '0.5rem', marginBottom: '1rem' }}>
