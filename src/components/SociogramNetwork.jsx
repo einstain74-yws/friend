@@ -71,9 +71,18 @@ function mergeStudentsForGraph(students, responses, relationships) {
   }));
 }
 
+function getDefaultGraphSize() {
+  if (typeof window === 'undefined') return { width: 800, height: 600 };
+  /** 첫 프레임에서 0×0 → 1×1 캔버스가 되어 노드가 안 보이는 문제 방지 */
+  return {
+    width: Math.max(320, Math.floor(window.innerWidth * 0.4)),
+    height: Math.max(400, Math.floor(window.innerHeight * 0.55)),
+  };
+}
+
 export default function SociogramNetwork({ students, relationships, responses = [], snapshotKey = 'current' }) {
   const fgRef = useRef();
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [dimensions, setDimensions] = useState(getDefaultGraphSize);
   const containerRef = useRef();
 
   const updateDimensions = () => {
@@ -147,12 +156,16 @@ export default function SociogramNetwork({ students, relationships, responses = 
       };
     });
 
-    const links = (relationships || []).map((r) => ({
-      source: String(r.source),
-      target: String(r.target),
-      type: r.type,
-      color: r.type === 'positive' ? '#10B981' : '#F59E0B',
-    }));
+    const nodeIdSet = new Set(nodes.map((n) => String(n.id)));
+    const links = (relationships || [])
+      .map((r) => ({
+        source: String(r.source),
+        target: String(r.target),
+        type: r.type,
+        color: r.type === 'positive' ? '#10B981' : '#F59E0B',
+      }))
+      /** 존재하지 않는 노드를 가리키는 링크는 시뮬레이션·줌을 깨뜨릴 수 있음 */
+      .filter((l) => nodeIdSet.has(l.source) && nodeIdSet.has(l.target));
 
     return { nodes, links };
   }, [students, relationships, responses]);
@@ -237,8 +250,8 @@ export default function SociogramNetwork({ students, relationships, responses = 
     );
   }
 
-  const graphWidth = Math.max(dimensions.width, 1);
-  const graphHeight = Math.max(dimensions.height, 1);
+  const graphWidth = Math.max(dimensions.width, 64);
+  const graphHeight = Math.max(dimensions.height, 64);
 
   return (
     <div
@@ -257,6 +270,12 @@ export default function SociogramNetwork({ students, relationships, responses = 
         nodeRelSize={1}
         warmupTicks={80}
         cooldownTicks={50}
+        onEngineStop={() => {
+          const fg = fgRef.current;
+          if (fg && graphData.nodes.length > 0) {
+            fg.zoomToFit(400, 80);
+          }
+        }}
         onRenderFramePost={paintLabels}
         linkColor="color"
         linkDirectionalArrowLength={5}
