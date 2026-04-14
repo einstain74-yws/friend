@@ -1,4 +1,8 @@
-# React + Vite
+# 학급 교우 관계 분석기 (React + Vite)
+
+클라우드 동기화는 **Supabase** 를 사용합니다. 설정은 [SUPABASE.md](SUPABASE.md) 를 참고하세요.
+
+---
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 

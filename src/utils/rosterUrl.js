@@ -1,6 +1,6 @@
 /**
  * 명단을 URL에 실어 다른 기기에서 쓰기 (서버 미사용 시 #r= 해시).
- * 서버(VITE_API_BASE) 사용 시 ?session= 만으로 짧게 공유.
+ * Supabase(VITE_SUPABASE_*) 사용 시 ?session= 만으로 짧게 공유.
  */
 
 export function getSessionIdFromUrl() {

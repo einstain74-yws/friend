@@ -23,7 +23,7 @@ function App() {
       /** 다른 기기(학생 폰)에서는 localStorage가 비어 있음 → 주소의 명단(#r=) 우선 */
       const fromUrl = decodeRosterFromLocation();
       if (fromUrl?.length) return fromUrl;
-    } catch (_) {
+    } catch {
       /* ignore */
     }
     try {
@@ -103,7 +103,7 @@ function App() {
       } catch (e) {
         console.error(e);
         alert(
-          '서버에서 데이터를 불러오지 못했습니다. API 서버 주소(VITE_API_BASE)와 실행 여부를 확인하세요.'
+          'Supabase에서 데이터를 불러오지 못했습니다. VITE_SUPABASE_URL·VITE_SUPABASE_ANON_KEY와 SQL 마이그레이션을 확인하세요.'
         );
       } finally {
         setCloudReady(true);
@@ -201,8 +201,8 @@ function App() {
     if (isCloudEnabled() && sessionId) {
       try {
         await cloudApi.postResponse(sessionId, surveyData);
-      } catch (e) {
-        alert('서버에 저장하지 못했습니다. 네트워크를 확인해 주세요.');
+      } catch {
+        alert('Supabase에 저장하지 못했습니다. 네트워크를 확인해 주세요.');
         return;
       }
     }
@@ -261,10 +261,10 @@ function App() {
       await cloudApi.putRoster(id, students);
       await cloudApi.putResponses(id, responses);
       alert(
-        '클라우드 클래스가 생성되었습니다. 학생용 QR·링크는 짧은 주소(?session=)로 생성되며, 제출 내용이 이 서버에 모입니다.'
+        '클라우드 클래스가 생성되었습니다. 학생용 QR·링크는 짧은 주소(?session=)로 생성되며, 제출 내용이 Supabase에 모입니다.'
       );
     } catch (e) {
-      alert(e.message || '세션을 만들 수 없습니다. API 서버를 확인하세요.');
+      alert(e.message || '세션을 만들 수 없습니다. Supabase URL·키·SQL 마이그레이션을 확인하세요.');
     }
   };
 
