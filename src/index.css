@@ -443,3 +443,9 @@ ol.ranking-list li:last-child {
   padding: 1rem;
   border-radius: 12px;
 }
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

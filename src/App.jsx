@@ -8,6 +8,7 @@ import SurveyForm from './components/SurveyForm';
 import { decodeRosterFromLocation, buildStudentAccessUrl, stripRosterFromAddressBar } from './utils/rosterUrl';
 import { isCloudEnabled } from './config.js';
 import * as cloudApi from './api/cloudApi.js';
+import AuthPanel from './components/AuthPanel.jsx';
 
 const LS_SESSION = 'sociogram_cloud_session_id';
 
@@ -345,7 +346,10 @@ function App() {
   if (view === 'home') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--background)', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-        
+        <div style={{ position: 'absolute', top: '2rem', left: '2rem', zIndex: 5 }}>
+          <AuthPanel />
+        </div>
+
         <button 
           onClick={() => setShowQR(true)}
           style={{ position: 'absolute', top: '2rem', right: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'white', padding: '0.75rem 1.25rem', borderRadius: '12px', cursor: 'pointer', border: '1px solid var(--border)', boxShadow: 'var(--shadow-md)', color: 'var(--text-main)', fontWeight: 'bold' }}
@@ -481,7 +485,8 @@ function App() {
             ? `${new Date().getMonth() + 1}월 ${new Date().getDate()}일 현재 교우 관계 분석` 
             : `과거 기록: ${surveyHistory.find(h => h.id === activeHistoryId)?.title || '알 수 없음'}`}
         </h1>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <AuthPanel compact />
           <button className="btn" style={{ background: 'var(--background)', border: '1px solid var(--border)' }} onClick={handleChangePassword}>
             <Lock size={18} />
             비밀번호 변경

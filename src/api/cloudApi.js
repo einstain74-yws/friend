@@ -1,17 +1,12 @@
-import { createClient } from '@supabase/supabase-js';
-import { getSupabaseConfig, isCloudEnabled } from '../config.js';
+import { getSupabaseClient } from '../lib/supabaseClient.js';
+import { isCloudEnabled } from '../config.js';
 
 export { isCloudEnabled };
 
-let client;
-
 function getClient() {
-  if (!isCloudEnabled()) {
-    throw new Error('Supabase가 설정되지 않았습니다.');
-  }
+  const client = getSupabaseClient();
   if (!client) {
-    const { url, anonKey } = getSupabaseConfig();
-    client = createClient(url, anonKey);
+    throw new Error('Supabase가 설정되지 않았습니다.');
   }
   return client;
 }

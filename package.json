@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "api": "npm run start --prefix server",
-    "db:apply": "node scripts/apply-migration.mjs"
+    "db:apply": "node scripts/apply-migration.mjs",
+    "gh:secrets": "powershell -ExecutionPolicy Bypass -File scripts/push-github-secrets.ps1"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.103.0",
