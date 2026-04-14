@@ -4,6 +4,13 @@ import { Download } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
+/** localStorage 등에서 문자열로 올 수 있음 */
+function parseQ9(raw) {
+  if (raw == null || raw === '') return undefined;
+  const n = typeof raw === 'number' ? raw : Number(raw);
+  return Number.isFinite(n) ? n : undefined;
+}
+
 /** 설문 9번(친화성) 점수 → 노드 반경·색 (리커트 1~5 가정) */
 function getAgreeablenessStyle(q9) {
   const fallback = {
@@ -12,10 +19,10 @@ function getAgreeablenessStyle(q9) {
     ring: 'rgba(148, 163, 184, 0.9)',
     fill: '#64748b',
   };
-  if (typeof q9 !== 'number' || Number.isNaN(q9)) {
+  const q = parseQ9(q9);
+  if (q === undefined) {
     return fallback;
   }
-  const q = q9;
   if (q > 5) {
     return { outerR: 10, innerR: 8, ring: 'rgba(254, 243, 199, 0.95)', fill: '#ca8a04' };
   }
@@ -75,13 +82,15 @@ export default function SociogramNetwork({ students, relationships, responses = 
   const graphData = useMemo(() => {
     const q9ByAuthor = {};
     (responses || []).forEach((r) => {
-      if (r.authorId && typeof r.q9 === 'number') {
-        q9ByAuthor[r.authorId] = r.q9;
+      if (r.authorId == null || r.authorId === '') return;
+      const q = parseQ9(r.q9);
+      if (q !== undefined) {
+        q9ByAuthor[String(r.authorId)] = q;
       }
     });
 
     const nodes = students.map((s) => {
-      const q9 = q9ByAuthor[s.id];
+      const q9 = q9ByAuthor[String(s.id)];
       const style = getAgreeablenessStyle(q9);
       return {
         id: s.id,
@@ -157,7 +166,8 @@ export default function SociogramNetwork({ students, relationships, responses = 
         graphData={graphData}
         nodeLabel="name"
         nodeColor={(n) => getAgreeablenessStyle(n.q9).fill}
-        nodeRelSize={6}
+        nodeRelSize={1}
+        nodeCanvasObjectMode="replace"
         linkColor="color"
         linkDirectionalArrowLength={5}
         linkDirectionalArrowRelPos={1}
