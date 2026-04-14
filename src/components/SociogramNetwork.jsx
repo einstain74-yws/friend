@@ -4,7 +4,37 @@ import { Download } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
-export default function SociogramNetwork({ students, relationships, snapshotKey = 'current' }) {
+/** 설문 9번(친화성) 점수 → 노드 반경·색 (리커트 1~5 가정) */
+function getAgreeablenessStyle(q9) {
+  const fallback = {
+    outerR: 4,
+    innerR: 3,
+    ring: 'rgba(148, 163, 184, 0.9)',
+    fill: '#64748b',
+  };
+  if (typeof q9 !== 'number' || Number.isNaN(q9)) {
+    return fallback;
+  }
+  const q = q9;
+  if (q > 5) {
+    return { outerR: 10, innerR: 8, ring: 'rgba(254, 243, 199, 0.95)', fill: '#ca8a04' };
+  }
+  if (q < 1) {
+    return { outerR: 4, innerR: 3, ring: 'rgba(196, 181, 253, 0.9)', fill: '#7c3aed' };
+  }
+  if (q >= 4 && q <= 5) {
+    return { outerR: 10, innerR: 8, ring: 'rgba(254, 243, 199, 0.95)', fill: '#ca8a04' };
+  }
+  if (q > 2 && q < 4) {
+    return { outerR: 7, innerR: 6, ring: 'rgba(191, 219, 254, 0.95)', fill: '#2563eb' };
+  }
+  if (q >= 1 && q <= 2) {
+    return { outerR: 4, innerR: 3, ring: 'rgba(196, 181, 253, 0.9)', fill: '#7c3aed' };
+  }
+  return fallback;
+}
+
+export default function SociogramNetwork({ students, relationships, responses = [], snapshotKey = 'current' }) {
   const fgRef = useRef();
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const containerRef = useRef();
@@ -43,11 +73,23 @@ export default function SociogramNetwork({ students, relationships, snapshotKey 
   }, [students.length]);
 
   const graphData = useMemo(() => {
-    const nodes = students.map(s => ({
-      id: s.id,
-      name: s.name,
-      val: 1
-    }));
+    const q9ByAuthor = {};
+    (responses || []).forEach((r) => {
+      if (r.authorId && typeof r.q9 === 'number') {
+        q9ByAuthor[r.authorId] = r.q9;
+      }
+    });
+
+    const nodes = students.map((s) => {
+      const q9 = q9ByAuthor[s.id];
+      const style = getAgreeablenessStyle(q9);
+      return {
+        id: s.id,
+        name: s.name,
+        q9,
+        val: style.outerR / 3,
+      };
+    });
 
     const links = relationships.map(r => ({
       source: r.source,
@@ -57,7 +99,7 @@ export default function SociogramNetwork({ students, relationships, snapshotKey 
     }));
 
     return { nodes, links };
-  }, [students, relationships]);
+  }, [students, relationships, responses]);
 
   useEffect(() => {
     if (!fgRef.current || graphData.nodes.length === 0) return;
@@ -114,7 +156,7 @@ export default function SociogramNetwork({ students, relationships, snapshotKey 
         height={graphHeight}
         graphData={graphData}
         nodeLabel="name"
-        nodeColor={() => '#4F46E5'}
+        nodeColor={(n) => getAgreeablenessStyle(n.q9).fill}
         nodeRelSize={6}
         linkColor="color"
         linkDirectionalArrowLength={5}
@@ -123,24 +165,32 @@ export default function SociogramNetwork({ students, relationships, snapshotKey 
         linkWidth={2}
         nodeCanvasObject={(node, ctx, globalScale) => {
           const label = node.name;
-          const fontSize = 12/globalScale;
+          const fontSize = 12 / globalScale;
           ctx.font = `${fontSize}px Inter, Sans-Serif`;
-          const textWidth = ctx.measureText(label).width;
-          
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+          const st = getAgreeablenessStyle(node.q9);
+
+          ctx.fillStyle = st.ring;
           ctx.beginPath();
-          ctx.arc(node.x, node.y, 6, 0, 2 * Math.PI, false);
+          ctx.arc(node.x, node.y, st.outerR, 0, 2 * Math.PI, false);
           ctx.fill();
-          
-          ctx.fillStyle = '#4F46E5';
+
+          ctx.fillStyle = st.fill;
           ctx.beginPath();
-          ctx.arc(node.x, node.y, 5, 0, 2 * Math.PI, false);
+          ctx.arc(node.x, node.y, st.innerR, 0, 2 * Math.PI, false);
           ctx.fill();
 
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillStyle = '#111827';
-          ctx.fillText(label, node.x, node.y + 10 + fontSize/2);
+          ctx.fillText(label, node.x, node.y + st.outerR + 4 + fontSize / 2);
+        }}
+        nodePointerAreaPaint={(node, color, ctx) => {
+          const st = getAgreeablenessStyle(node.q9);
+          const hit = st.outerR + 4;
+          ctx.fillStyle = color;
+          ctx.beginPath();
+          ctx.arc(node.x, node.y, hit, 0, 2 * Math.PI, false);
+          ctx.fill();
         }}
       />
       <div className="floating-controls" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end', position: 'absolute', bottom: '1rem', right: '1rem' }}>
@@ -152,9 +202,19 @@ export default function SociogramNetwork({ students, relationships, snapshotKey 
           <Download size={14} />
           PDF로 저장
         </button>
-        <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', color: 'var(--text-muted)', background: 'white', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-md)' }}>
-          <span style={{width: 10, height: 10, borderRadius: '50%', background: '#10B981', display: 'inline-block'}}></span> 좋아함
-          <span style={{width: 10, height: 10, borderRadius: '50%', background: '#F59E0B', display: 'inline-block', marginLeft: '0.5rem'}}></span> 싫어함
+        <div style={{display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.75rem', color: 'var(--text-muted)', background: 'white', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', boxShadow: 'var(--shadow-md)' }}>
+          <div style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.7rem' }}>관계 화살표</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <span><span style={{ width: 10, height: 10, borderRadius: '50%', background: '#10B981', display: 'inline-block', verticalAlign: 'middle' }} /> 좋아함</span>
+            <span><span style={{ width: 10, height: 10, borderRadius: '50%', background: '#F59E0B', display: 'inline-block', verticalAlign: 'middle', marginLeft: '0.25rem' }} /> 싫어함</span>
+          </div>
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.35rem', marginTop: '0.1rem', fontWeight: 600, color: 'var(--text-main)', fontSize: '0.7rem' }}>9번 친화성 (노드)</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', fontSize: '0.68rem' }}>
+            <span><span style={{ width: 9, height: 9, borderRadius: '50%', background: '#ca8a04', display: 'inline-block', verticalAlign: 'middle' }} /> 큼 · 노랑 4~5점</span>
+            <span><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#2563eb', display: 'inline-block', verticalAlign: 'middle' }} /> 중간 · 파랑 2초과~4미만</span>
+            <span><span style={{ width: 6, height: 6, borderRadius: '50%', background: '#7c3aed', display: 'inline-block', verticalAlign: 'middle' }} /> 작음 · 보라 1~2점</span>
+            <span><span style={{ width: 6, height: 6, borderRadius: '50%', background: '#64748b', display: 'inline-block', verticalAlign: 'middle' }} /> 작음 · 회색 미응답</span>
+          </div>
         </div>
       </div>
     </div>

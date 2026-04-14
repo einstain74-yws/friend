@@ -363,6 +363,7 @@ function App() {
           <SociogramNetwork 
             students={activeStudents} 
             relationships={relationships}
+            responses={activeResponses}
             snapshotKey={activeHistoryId}
           />
         </section>
