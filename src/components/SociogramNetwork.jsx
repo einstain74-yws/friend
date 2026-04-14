@@ -165,17 +165,20 @@ export default function SociogramNetwork({ students, relationships, responses = 
         height={graphHeight}
         graphData={graphData}
         nodeLabel={() => ''}
-        nodeColor={(n) => getAgreeablenessStyle(n.q9).fill}
-        nodeRelSize={1}
-        nodeCanvasObjectMode="replace"
+        nodeColor={() => 'rgba(0,0,0,0)'}
+        nodeRelSize={0}
+        nodeCanvasObjectMode="after"
         linkColor="color"
         linkDirectionalArrowLength={5}
         linkDirectionalArrowRelPos={1}
         linkCurvature={0.2}
         linkWidth={2}
         nodeCanvasObject={(node, ctx, globalScale) => {
-          const label = node.name || '';
+          const label = String(node.name || '');
           const st = getAgreeablenessStyle(node.q9);
+          const gs = globalScale || 1;
+
+          ctx.save();
 
           ctx.fillStyle = st.ring;
           ctx.beginPath();
@@ -187,22 +190,27 @@ export default function SociogramNetwork({ students, relationships, responses = 
           ctx.arc(node.x, node.y, st.innerR, 0, 2 * Math.PI, false);
           ctx.fill();
 
-          /* 화면에서 항상 읽을 수 있게: 화면 기준 ~13px 유지 + 과도한 줌에서도 최소 크기 */
+          /* replace 모드는 노드마다 ctx.restore()로 변환 스택이 깨져 글자가 안 보일 수 있음 → after 모드에서 그림 */
           const screenPx = 13;
-          let fontSize = screenPx / globalScale;
-          fontSize = Math.max(fontSize, 7);
-          fontSize = Math.min(fontSize, 48);
-          ctx.font = `600 ${fontSize}px system-ui, "Segoe UI", "Malgun Gothic", sans-serif`;
+          let fontSize = screenPx / gs;
+          fontSize = Math.max(fontSize, 8);
+          fontSize = Math.min(fontSize, 56);
+          ctx.font = `600 ${fontSize}px system-ui, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'top';
-          const labelY = node.y + st.outerR + 4 / globalScale;
+          const labelY = node.y + st.outerR + 5 / gs;
 
-          ctx.lineWidth = 4 / globalScale;
+          ctx.lineWidth = Math.max(3 / gs, 1);
           ctx.lineJoin = 'round';
-          ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+          ctx.miterLimit = 2;
+          ctx.strokeStyle = 'rgba(255,255,255,0.98)';
           ctx.fillStyle = '#0f172a';
-          ctx.strokeText(label, node.x, labelY);
-          ctx.fillText(label, node.x, labelY);
+          if (label) {
+            ctx.strokeText(label, node.x, labelY);
+            ctx.fillText(label, node.x, labelY);
+          }
+
+          ctx.restore();
         }}
         nodePointerAreaPaint={(node, color, ctx, globalScale) => {
           const st = getAgreeablenessStyle(node.q9);
