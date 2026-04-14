@@ -215,21 +215,20 @@ function App() {
 
         {showQR && (
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }} onClick={() => setShowQR(false)}>
-            <div style={{ background: 'white', padding: '3rem', borderRadius: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: 'var(--shadow-xl)', gap: '1.5rem', textAlign: 'center', maxWidth: '420px' }} onClick={e => e.stopPropagation()}>
-              <h2 style={{ margin: 0, color: 'var(--text-main)' }}>학생 접속용 QR 코드</h2>
+            <div style={{ background: 'white', padding: '2rem 2.25rem', borderRadius: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: 'var(--shadow-xl)', gap: '1rem', textAlign: 'center', maxWidth: '360px' }} onClick={e => e.stopPropagation()}>
+              <h2 style={{ margin: 0, color: 'var(--text-main)', fontSize: '1.25rem' }}>학생 접속용 QR</h2>
               {students.length === 0 ? (
-                <p style={{ margin: 0, color: 'var(--danger)', fontSize: '0.95rem', lineHeight: 1.5 }}>
-                  아직 이 브라우저에 학생 명단이 없습니다. 먼저 <strong>교사용</strong>에서 명단을 등록한 뒤, 처음 화면으로 돌아와 QR을 다시 여세요. (명단은 QR·링크에 포함되어 학생 기기로 전달됩니다.)
+                <p style={{ margin: 0, color: 'var(--danger)', fontSize: '0.9rem', lineHeight: 1.5 }}>
+                  먼저 <strong>교사용</strong>에서 명단을 등록한 뒤, 이 화면을 다시 여 주세요.
                 </p>
               ) : (
-                <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.95rem', lineHeight: 1.5 }}>
-                  이 QR과 주소에는 현재 등록된 학생 이름이 포함되어 있습니다. 학생이 스캔하면 <strong>내 이름은?</strong> 목록에 이름이 보입니다.
+                <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.85rem', lineHeight: 1.4 }}>
+                  스마트폰 카메라로 QR을 스캔하면 설문으로 이동합니다.
                 </p>
               )}
-              <div style={{ padding: '1.5rem', background: 'white', borderRadius: '16px', border: '1px solid var(--border)', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}>
-                <QRCodeSVG value={buildStudentAccessUrl(students)} size={250} level="M" />
+              <div style={{ padding: '1rem', background: 'white', borderRadius: '16px', border: '1px solid var(--border)', lineHeight: 0 }}>
+                <QRCodeSVG value={buildStudentAccessUrl(students)} size={280} level="L" includeMargin />
               </div>
-              <p style={{ margin: 0, fontSize: '0.8rem', color: '#6b7280', wordBreak: 'break-all', maxWidth: '100%' }}>{buildStudentAccessUrl(students)}</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%' }}>
                 <button
                   type="button"
@@ -240,7 +239,7 @@ function App() {
                       await navigator.clipboard.writeText(buildStudentAccessUrl(students));
                       alert(students.length ? '명단이 포함된 주소를 복사했습니다. 카톡 등으로 학생에게 보내도 됩니다.' : '주소를 복사했습니다. 교사용에서 명단을 넣은 뒤 다시 복사하세요.');
                     } catch {
-                      alert('복사에 실패했습니다. 주소를 길게 눌러 직접 복사해 주세요.');
+                      alert('복사에 실패했습니다. 브라우저 설정에서 클립보드 권한을 확인해 주세요.');
                     }
                   }}
                 >
