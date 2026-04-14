@@ -11,12 +11,12 @@ function parseQ9(raw) {
   return Number.isFinite(n) ? n : undefined;
 }
 
-/** 설문 9번(친화성) 점수 → 노드 반경·색 (리커트 1~5 가정) */
+/** 설문 9번(친화성) 점수 → 노드 반경·색 (리커트 1~5 가정) — 크기·원색 대비 강화 */
 function getAgreeablenessStyle(q9) {
   const fallback = {
-    outerR: 4,
-    innerR: 3,
-    ring: 'rgba(148, 163, 184, 0.9)',
+    outerR: 6,
+    innerR: 5,
+    ring: '#cbd5e1',
     fill: '#64748b',
   };
   const q = parseQ9(q9);
@@ -24,19 +24,19 @@ function getAgreeablenessStyle(q9) {
     return fallback;
   }
   if (q > 5) {
-    return { outerR: 10, innerR: 8, ring: 'rgba(254, 243, 199, 0.95)', fill: '#ca8a04' };
+    return { outerR: 18, innerR: 15, ring: '#FDE047', fill: '#EAB308' };
   }
   if (q < 1) {
-    return { outerR: 4, innerR: 3, ring: 'rgba(196, 181, 253, 0.9)', fill: '#7c3aed' };
+    return { outerR: 6, innerR: 5, ring: '#C084FC', fill: '#7E22CE' };
   }
   if (q >= 4 && q <= 5) {
-    return { outerR: 10, innerR: 8, ring: 'rgba(254, 243, 199, 0.95)', fill: '#ca8a04' };
+    return { outerR: 18, innerR: 15, ring: '#FDE047', fill: '#EAB308' };
   }
   if (q > 2 && q < 4) {
-    return { outerR: 7, innerR: 6, ring: 'rgba(191, 219, 254, 0.95)', fill: '#2563eb' };
+    return { outerR: 11, innerR: 9, ring: '#93C5FD', fill: '#2563EB' };
   }
   if (q >= 1 && q <= 2) {
-    return { outerR: 4, innerR: 3, ring: 'rgba(196, 181, 253, 0.9)', fill: '#7c3aed' };
+    return { outerR: 6, innerR: 5, ring: '#C084FC', fill: '#7E22CE' };
   }
   return fallback;
 }
@@ -164,7 +164,7 @@ export default function SociogramNetwork({ students, relationships, responses = 
         width={graphWidth}
         height={graphHeight}
         graphData={graphData}
-        nodeLabel="name"
+        nodeLabel={() => ''}
         nodeColor={(n) => getAgreeablenessStyle(n.q9).fill}
         nodeRelSize={1}
         nodeCanvasObjectMode="replace"
@@ -174,9 +174,7 @@ export default function SociogramNetwork({ students, relationships, responses = 
         linkCurvature={0.2}
         linkWidth={2}
         nodeCanvasObject={(node, ctx, globalScale) => {
-          const label = node.name;
-          const fontSize = 12 / globalScale;
-          ctx.font = `${fontSize}px Inter, Sans-Serif`;
+          const label = node.name || '';
           const st = getAgreeablenessStyle(node.q9);
 
           ctx.fillStyle = st.ring;
@@ -189,18 +187,33 @@ export default function SociogramNetwork({ students, relationships, responses = 
           ctx.arc(node.x, node.y, st.innerR, 0, 2 * Math.PI, false);
           ctx.fill();
 
+          /* 화면에서 항상 읽을 수 있게: 화면 기준 ~13px 유지 + 과도한 줌에서도 최소 크기 */
+          const screenPx = 13;
+          let fontSize = screenPx / globalScale;
+          fontSize = Math.max(fontSize, 7);
+          fontSize = Math.min(fontSize, 48);
+          ctx.font = `600 ${fontSize}px system-ui, "Segoe UI", "Malgun Gothic", sans-serif`;
           ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillStyle = '#111827';
-          ctx.fillText(label, node.x, node.y + st.outerR + 4 + fontSize / 2);
+          ctx.textBaseline = 'top';
+          const labelY = node.y + st.outerR + 4 / globalScale;
+
+          ctx.lineWidth = 4 / globalScale;
+          ctx.lineJoin = 'round';
+          ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+          ctx.fillStyle = '#0f172a';
+          ctx.strokeText(label, node.x, labelY);
+          ctx.fillText(label, node.x, labelY);
         }}
-        nodePointerAreaPaint={(node, color, ctx) => {
+        nodePointerAreaPaint={(node, color, ctx, globalScale) => {
           const st = getAgreeablenessStyle(node.q9);
-          const hit = st.outerR + 4;
+          const gs = globalScale || 1;
           ctx.fillStyle = color;
           ctx.beginPath();
-          ctx.arc(node.x, node.y, hit, 0, 2 * Math.PI, false);
+          ctx.arc(node.x, node.y, st.outerR + 4 / gs, 0, 2 * Math.PI, false);
           ctx.fill();
+          const lw = 72 / gs;
+          const lh = 20 / gs;
+          ctx.fillRect(node.x - lw / 2, node.y + st.outerR + 2 / gs, lw, lh);
         }}
       />
       <div className="floating-controls" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'flex-end', position: 'absolute', bottom: '1rem', right: '1rem' }}>
@@ -220,9 +233,9 @@ export default function SociogramNetwork({ students, relationships, responses = 
           </div>
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.35rem', marginTop: '0.1rem', fontWeight: 600, color: 'var(--text-main)', fontSize: '0.7rem' }}>9번 친화성 (노드)</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', fontSize: '0.68rem' }}>
-            <span><span style={{ width: 9, height: 9, borderRadius: '50%', background: '#ca8a04', display: 'inline-block', verticalAlign: 'middle' }} /> 큼 · 노랑 4~5점</span>
-            <span><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#2563eb', display: 'inline-block', verticalAlign: 'middle' }} /> 중간 · 파랑 2초과~4미만</span>
-            <span><span style={{ width: 6, height: 6, borderRadius: '50%', background: '#7c3aed', display: 'inline-block', verticalAlign: 'middle' }} /> 작음 · 보라 1~2점</span>
+            <span><span style={{ width: 10, height: 10, borderRadius: '50%', background: '#EAB308', border: '1px solid #FDE047', display: 'inline-block', verticalAlign: 'middle' }} /> 큼 · 노랑 4~5점</span>
+            <span><span style={{ width: 9, height: 9, borderRadius: '50%', background: '#2563eb', display: 'inline-block', verticalAlign: 'middle' }} /> 중간 · 파랑 2초과~4미만</span>
+            <span><span style={{ width: 7, height: 7, borderRadius: '50%', background: '#7E22CE', border: '1px solid #C084FC', display: 'inline-block', verticalAlign: 'middle' }} /> 작음 · 보라 1~2점</span>
             <span><span style={{ width: 6, height: 6, borderRadius: '50%', background: '#64748b', display: 'inline-block', verticalAlign: 'middle' }} /> 작음 · 회색 미응답</span>
           </div>
         </div>
