@@ -65,17 +65,19 @@ export default function InsightsDashboard({ students, relationships, responses }
 
   const neurosisRiskStudents = useMemo(() => {
     if (!responses) return [];
-    
+    const NEUROSIS_AVG_THRESHOLD = 3.5;
+
     return responses
-      .filter(r => {
+      .filter((r) => {
         if (typeof r.q6 === 'number' && typeof r.q7 === 'number' && typeof r.q8 === 'number') {
           const avg = (r.q6 + r.q7 + r.q8) / 3;
-          return avg >= 4;
+          return avg >= NEUROSIS_AVG_THRESHOLD;
         }
         return false;
       })
-      .map(r => {
-        const student = students.find(s => s.id === r.authorId);
+      .map((r) => {
+        const student = students.find((s) => s.id === r.authorId);
+        const avgNum = (r.q6 + r.q7 + r.q8) / 3;
         return {
           id: r.authorId,
           name: student ? student.name : '알 수 없음',
@@ -84,9 +86,11 @@ export default function InsightsDashboard({ students, relationships, responses }
           q8: r.q8,
           q9: r.q9,
           q10: r.q10,
-          avg: ((r.q6 + r.q7 + r.q8) / 3).toFixed(1)
+          avgNum,
+          avg: avgNum.toFixed(1),
         };
-      });
+      })
+      .sort((a, b) => b.avgNum - a.avgNum);
   }, [responses, students]);
 
   const downloadReport = () => {
@@ -311,7 +315,7 @@ export default function InsightsDashboard({ students, relationships, responses }
         <div className="insight-header-title" style={{color: '#be123c', marginBottom: '1rem'}}>
           <AlertCircle size={20} />
           신경증 고위험군
-          <span style={{fontSize: '0.75rem', fontWeight: 'normal', color: '#881337', marginLeft: '0.5rem'}}>(6, 7, 8번 평균 4.0 이상)</span>
+          <span style={{fontSize: '0.75rem', fontWeight: 'normal', color: '#881337', marginLeft: '0.5rem'}}>(6, 7, 8번 평균 3.5 이상)</span>
         </div>
         {neurosisRiskStudents.length === 0 ? (
           <div className="empty-state" style={{padding: '1rem', color: '#be123c'}}>해당하는 학생이 없습니다.</div>
