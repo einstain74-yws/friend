@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# SQLite (클래스 API 로컬 실행 시)
+server/data/

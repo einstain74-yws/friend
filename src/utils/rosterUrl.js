@@ -1,7 +1,12 @@
 /**
- * 학생 명단을 URL에 실어 다른 기기(학생 폰)에서도 동일 명단을 쓰기 위함.
- * localStorage는 기기·브라우저마다 따로이므로, QR/링크만으로는 명단이 비었음.
+ * 명단을 URL에 실어 다른 기기에서 쓰기 (서버 미사용 시 #r= 해시).
+ * 서버(VITE_API_BASE) 사용 시 ?session= 만으로 짧게 공유.
  */
+
+export function getSessionIdFromUrl() {
+  if (typeof window === 'undefined') return null;
+  return new URLSearchParams(window.location.search).get('session');
+}
 
 export function encodeRosterParam(students) {
   if (!students?.length) return '';
@@ -31,9 +36,10 @@ export function decodeRosterParam(encoded) {
   }
 }
 
-/** 현재 주소의 ?r= 또는 #r= 에서 명단 복원 */
+/** 현재 주소의 ?r= 또는 #r= (서버 세션이 없을 때만) */
 export function decodeRosterFromLocation() {
   if (typeof window === 'undefined') return null;
+  if (getSessionIdFromUrl()) return null;
   const params = new URLSearchParams(window.location.search);
   const queryR = params.get('r');
   if (queryR) {
@@ -49,17 +55,26 @@ export function decodeRosterFromLocation() {
   return null;
 }
 
-/** 학생이 설문 화면까지 갈 때 쓰는 주소(명단 포함) */
-export function buildStudentAccessUrl(students) {
+/**
+ * 학생 설문 접속 주소
+ * @param {Array} students
+ * @param {string|null} cloudSessionId 서버 연동 시 짧은 ?session= 만 사용
+ */
+export function buildStudentAccessUrl(students, cloudSessionId = null) {
   if (typeof window === 'undefined') return '';
-  const base = `${window.location.origin}${window.location.pathname}${window.location.search}`;
-  if (!students?.length) return base;
+  const originPath = `${window.location.origin}${window.location.pathname}`;
+  if (cloudSessionId) {
+    const u = new URL(originPath);
+    u.searchParams.set('session', cloudSessionId);
+    return u.toString();
+  }
+  if (!students?.length) return `${originPath}${window.location.search}`;
   const r = encodeRosterParam(students);
-  if (!r) return base;
-  return `${base}#r=${r}`;
+  if (!r) return `${originPath}${window.location.search}`;
+  return `${originPath}${window.location.search.replace(/\?$/, '')}#r=${r}`;
 }
 
-/** 로드 후 주소창에서 긴 #r= 제거(북마크·공유 시 깔끔하게) */
+/** 로드 후 주소창에서 긴 #r= 제거 */
 export function stripRosterFromAddressBar() {
   if (typeof window === 'undefined') return;
   if (!window.location.hash.match(/^#r=/)) return;

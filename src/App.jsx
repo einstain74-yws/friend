@@ -1,11 +1,15 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { Users, FileText, Lock, ArrowLeft, ShieldCheck, QrCode, Trash2, Link2 } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Users, FileText, Lock, ArrowLeft, ShieldCheck, QrCode, Trash2, Link2, Cloud } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import StudentManager from './components/StudentManager';
 import SociogramNetwork from './components/SociogramNetwork';
 import InsightsDashboard from './components/InsightsDashboard';
 import SurveyForm from './components/SurveyForm';
 import { decodeRosterFromLocation, buildStudentAccessUrl, stripRosterFromAddressBar } from './utils/rosterUrl';
+import { isCloudEnabled } from './config.js';
+import * as cloudApi from './api/cloudApi.js';
+
+const LS_SESSION = 'sociogram_cloud_session_id';
 
 function App() {
   const [view, setView] = useState('home'); // 'home' | 'teacher' | 'survey'
@@ -42,6 +46,24 @@ function App() {
 
   const [activeHistoryId, setActiveHistoryId] = useState('current');
 
+  const [sessionId, setSessionId] = useState(() => {
+    if (typeof window === 'undefined') return null;
+    const q = new URLSearchParams(window.location.search).get('session');
+    if (q) return q;
+    if (isCloudEnabled()) return localStorage.getItem(LS_SESSION);
+    return null;
+  });
+
+  const [cloudReady, setCloudReady] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    if (!isCloudEnabled()) return true;
+    const q = new URLSearchParams(window.location.search).get('session');
+    const stored = localStorage.getItem(LS_SESSION);
+    return !(q || stored);
+  });
+
+  const rosterSyncTimer = useRef(null);
+
   useEffect(() => {
     localStorage.setItem('sociogram_students', JSON.stringify(students));
   }, [students]);
@@ -58,6 +80,64 @@ function App() {
   useEffect(() => {
     stripRosterFromAddressBar();
   }, []);
+
+  /** 서버 세션이 있으면 명단·응답을 한곳에서 불러옴 */
+  useEffect(() => {
+    if (!isCloudEnabled()) {
+      setCloudReady(true);
+      return;
+    }
+    const q = new URLSearchParams(window.location.search).get('session');
+    const sid = q || localStorage.getItem(LS_SESSION);
+    if (!sid) {
+      setCloudReady(true);
+      return;
+    }
+    setSessionId(sid);
+    localStorage.setItem(LS_SESSION, sid);
+    (async () => {
+      try {
+        const [st, resp] = await Promise.all([cloudApi.fetchRoster(sid), cloudApi.fetchResponses(sid)]);
+        setStudents(st);
+        setResponses(resp);
+      } catch (e) {
+        console.error(e);
+        alert(
+          '서버에서 데이터를 불러오지 못했습니다. API 서버 주소(VITE_API_BASE)와 실행 여부를 확인하세요.'
+        );
+      } finally {
+        setCloudReady(true);
+        if (window.location.search.includes('session=')) {
+          const u = new URL(window.location.href);
+          u.searchParams.delete('session');
+          window.history.replaceState(null, '', u.pathname + u.search + window.location.hash);
+        }
+        stripRosterFromAddressBar();
+      }
+    })();
+  }, []);
+
+  /** 클라우드 세션일 때 명단을 서버에 반영 */
+  useEffect(() => {
+    if (!isCloudEnabled() || !sessionId) return;
+    if (rosterSyncTimer.current) clearTimeout(rosterSyncTimer.current);
+    rosterSyncTimer.current = setTimeout(() => {
+      cloudApi.putRoster(sessionId, students).catch((e) => console.error('roster sync', e));
+    }, 700);
+    return () => clearTimeout(rosterSyncTimer.current);
+  }, [students, sessionId]);
+
+  /** 교사 화면·진행 중 설문일 때 응답 주기적 갱신 */
+  useEffect(() => {
+    if (!isCloudEnabled() || !sessionId) return;
+    if (view !== 'teacher' || activeHistoryId !== 'current') return;
+    const poll = () => {
+      cloudApi.fetchResponses(sessionId).then(setResponses).catch((e) => console.error('poll', e));
+    };
+    poll();
+    const id = setInterval(poll, 12000);
+    return () => clearInterval(id);
+  }, [view, sessionId, activeHistoryId]);
 
   const addStudent = (name) => {
     if (!name.trim()) return;
@@ -117,10 +197,18 @@ function App() {
     setActiveHistoryId('current');
   };
 
-  const handleSurveySubmit = (surveyData) => {
-    const newResponses = responses.filter(r => r.authorId !== surveyData.authorId);
+  const handleSurveySubmit = async (surveyData) => {
+    if (isCloudEnabled() && sessionId) {
+      try {
+        await cloudApi.postResponse(sessionId, surveyData);
+      } catch (e) {
+        alert('서버에 저장하지 못했습니다. 네트워크를 확인해 주세요.');
+        return;
+      }
+    }
+    const newResponses = responses.filter((r) => r.authorId !== surveyData.authorId);
     setResponses([...newResponses, surveyData]);
-    setView('home'); // Return to Home Gateway after submit
+    setView('home');
   };
 
   const activeResponses = activeHistoryId === 'current' 
@@ -148,17 +236,51 @@ function App() {
     const today = new Date();
     const defaultTitle = `${today.getMonth() + 1}월 ${today.getDate()}일 설문 마감`;
     const title = prompt('마감할 설문의 제목(또는 마감일)을 입력하세요.', defaultTitle);
-    
+
     if (title) {
       const newHistory = {
         id: Date.now().toString(),
         title: title,
         responses: [...responses],
-        students: [...students]
+        students: [...students],
       };
       setSurveyHistory([...surveyHistory, newHistory]);
-      setResponses([]); // 리셋
+      setResponses([]);
+      if (isCloudEnabled() && sessionId) {
+        cloudApi.putResponses(sessionId, []).catch((e) => console.error('close survey sync', e));
+      }
       alert('설문이 마감되고 결과가 저장되었습니다. 과거 기록에서 열람할 수 있습니다.');
+    }
+  };
+
+  const handleCreateCloudSession = async () => {
+    try {
+      const { id } = await cloudApi.createSession();
+      setSessionId(id);
+      localStorage.setItem(LS_SESSION, id);
+      await cloudApi.putRoster(id, students);
+      await cloudApi.putResponses(id, responses);
+      alert(
+        '클라우드 클래스가 생성되었습니다. 학생용 QR·링크는 짧은 주소(?session=)로 생성되며, 제출 내용이 이 서버에 모입니다.'
+      );
+    } catch (e) {
+      alert(e.message || '세션을 만들 수 없습니다. API 서버를 확인하세요.');
+    }
+  };
+
+  const handleJoinCloudSession = async () => {
+    const raw = window.prompt('연결할 세션 ID를 붙여 넣으세요. (다른 PC에서 복사)');
+    if (!raw?.trim()) return;
+    const id = raw.trim();
+    try {
+      const [st, resp] = await Promise.all([cloudApi.fetchRoster(id), cloudApi.fetchResponses(id)]);
+      setSessionId(id);
+      localStorage.setItem(LS_SESSION, id);
+      setStudents(st);
+      setResponses(resp);
+      alert('서버 데이터를 불러왔습니다.');
+    } catch {
+      alert('세션을 찾을 수 없거나 서버 오류입니다.');
     }
   };
 
@@ -200,6 +322,25 @@ function App() {
     }
   };
 
+  if (!cloudReady && isCloudEnabled()) {
+    return (
+      <div
+        style={{
+          height: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexDirection: 'column',
+          gap: '0.75rem',
+          color: 'var(--text-muted)',
+          background: 'var(--background)',
+        }}
+      >
+        <p style={{ margin: 0 }}>서버에서 데이터를 불러오는 중…</p>
+      </div>
+    );
+  }
+
   // HOME GATEWAY VIEW
   if (view === 'home') {
     return (
@@ -227,7 +368,12 @@ function App() {
                 </p>
               )}
               <div style={{ padding: '1rem', background: 'white', borderRadius: '16px', border: '1px solid var(--border)', lineHeight: 0 }}>
-                <QRCodeSVG value={buildStudentAccessUrl(students)} size={280} level="L" includeMargin />
+                <QRCodeSVG
+                  value={buildStudentAccessUrl(students, isCloudEnabled() && sessionId ? sessionId : null)}
+                  size={280}
+                  level="L"
+                  includeMargin
+                />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%' }}>
                 <button
@@ -236,8 +382,16 @@ function App() {
                   style={{ width: '100%', padding: '0.65rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)' }}
                   onClick={async () => {
                     try {
-                      await navigator.clipboard.writeText(buildStudentAccessUrl(students));
-                      alert(students.length ? '명단이 포함된 주소를 복사했습니다. 카톡 등으로 학생에게 보내도 됩니다.' : '주소를 복사했습니다. 교사용에서 명단을 넣은 뒤 다시 복사하세요.');
+                      await navigator.clipboard.writeText(
+                        buildStudentAccessUrl(students, isCloudEnabled() && sessionId ? sessionId : null)
+                      );
+                      alert(
+                        students.length
+                          ? isCloudEnabled() && sessionId
+                            ? '클라우드 링크를 복사했습니다. 학생 제출이 서버에 모입니다.'
+                            : '명단이 포함된 주소를 복사했습니다.'
+                          : '주소를 복사했습니다. 교사용에서 명단을 넣은 뒤 다시 복사하세요.'
+                      );
                     } catch {
                       alert('복사에 실패했습니다. 브라우저 설정에서 클립보드 권한을 확인해 주세요.');
                     }
@@ -342,13 +496,55 @@ function App() {
       <main className="main-content">
         <aside className="sidebar">
           {activeHistoryId === 'current' ? (
-            <StudentManager 
-              students={students} 
-              onAdd={addStudent} 
-              onAddMultiple={addMultipleStudents}
-              onRemove={removeStudent}
-              onClearAll={clearAllStudents}
-            />
+            <>
+              <StudentManager
+                students={students}
+                onAdd={addStudent}
+                onAddMultiple={addMultipleStudents}
+                onRemove={removeStudent}
+                onClearAll={clearAllStudents}
+              />
+              {isCloudEnabled() && (
+                <div className="panel-section" style={{ borderBottom: 'none' }}>
+                  <h2 className="panel-title" style={{ alignItems: 'center', gap: '0.35rem' }}>
+                    <Cloud size={18} />
+                    클라우드 (서버 동기화)
+                  </h2>
+                  {sessionId ? (
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem', lineHeight: 1.45 }}>
+                      세션 ID가 저장되어 있습니다. 명단·설문 제출이 같은 서버에 모이며, 다른 컴퓨터에서도{' '}
+                      <strong>세션 ID로 연결</strong>하면 같은 결과를 볼 수 있습니다.
+                      <br />
+                      <code style={{ fontSize: '0.7rem', wordBreak: 'break-all' }}>{sessionId}</code>
+                    </p>
+                  ) : (
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem', lineHeight: 1.45 }}>
+                      새로 만들면 학생용 링크가 <code>?session=</code> 한 줄로 짧아지고, 제출 데이터가 서버에 쌓입니다.
+                    </p>
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {!sessionId && (
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        style={{ width: '100%' }}
+                        onClick={handleCreateCloudSession}
+                      >
+                        새 클라우드 클래스 만들기
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="btn"
+                      style={{ width: '100%', border: '1px solid var(--border)', background: 'var(--background)' }}
+                      onClick={handleJoinCloudSession}
+                    >
+                      세션 ID로 연결 (다른 PC)
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           ) : (
             <div className="panel-section">
               <h2 className="panel-title">설문 잠김</h2>
