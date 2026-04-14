@@ -82,9 +82,12 @@ body {
 
 .graph-area {
   flex: 1;
+  min-height: 0;
   position: relative;
   background: #f8f9fc;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .dashboard-panel {

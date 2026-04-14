@@ -79,13 +79,27 @@ export default function SociogramNetwork({ students, relationships, responses = 
   const updateDimensions = () => {
     const el = containerRef.current;
     if (!el) return;
-    const w = el.clientWidth;
-    const h = el.clientHeight;
+    let w = el.clientWidth;
+    let h = el.clientHeight;
+    if (w < 2 || h < 2) {
+      const r = el.getBoundingClientRect();
+      w = Math.max(r.width, w);
+      h = Math.max(r.height, h);
+    }
+    if ((w < 2 || h < 2) && typeof window !== 'undefined') {
+      w = Math.max(w, 320);
+      h = Math.max(h, 320);
+    }
     setDimensions((prev) => (prev.width === w && prev.height === h ? prev : { width: w, height: h }));
   };
 
   useLayoutEffect(() => {
     updateDimensions();
+    const id = requestAnimationFrame(() => {
+      updateDimensions();
+      requestAnimationFrame(updateDimensions);
+    });
+    return () => cancelAnimationFrame(id);
   }, []);
 
   useEffect(() => {
@@ -107,7 +121,7 @@ export default function SociogramNetwork({ students, relationships, responses = 
       ro.disconnect();
       window.removeEventListener('resize', updateDimensions);
     };
-  }, [students.length]);
+  }, [students.length, snapshotKey]);
 
   const graphData = useMemo(() => {
     const merged = mergeStudentsForGraph(students, responses, relationships);
@@ -227,7 +241,10 @@ export default function SociogramNetwork({ students, relationships, responses = 
   const graphHeight = Math.max(dimensions.height, 1);
 
   return (
-    <div ref={containerRef} style={{ width: '100%', height: '100%', minHeight: 0, position: 'relative', background: 'white' }}>
+    <div
+      ref={containerRef}
+      style={{ flex: 1, width: '100%', minHeight: 0, height: '100%', position: 'relative', background: 'white' }}
+    >
       <ForceGraph2D
         key={snapshotKey}
         ref={fgRef}
