@@ -10,6 +10,12 @@
 2. **`npx supabase init`** 으로 [`supabase/config.toml`](supabase/config.toml)이 생성됩니다(이 저장소에 반영됨).
 3. 원격 DB와 링크: **`npm run supabase -- link --project-ref <Project ID>`** — ID는 **Project Settings → General → Reference ID** (URL의 `https://xxxx.supabase.co` 의 `xxxx`와 다를 수 있음). DB 비밀번호를 물으면 **Database password**를 입력합니다. `Resource has been removed` 오류는 ref가 잘못됐거나 프로젝트가 삭제된 경우입니다.
 
+## 0. (참고) Cursor Supabase MCP로 만든 예시 프로젝트
+
+- 이름 **friend-sociogram**, 리전 **ap-northeast-2**, ref **`mctnxphbguqggentrlqy`** (URL: `https://mctnxphbguqggentrlqy.supabase.co`).
+- 테이블: **`class_sessions`**, **`rosters`**, **`survey_responses`**(전체 JSON 페이로드), **`survey_answer_rows`**(문항 `q1`~`q10`별 `value` jsonb). 모두 **anon RLS 전체 허용**(교실용 MVP).
+- API 키는 대시보드 **Project Settings → API**에서 확인합니다.
+
 ## 1. Supabase 프로젝트 만들기
 
 1. [supabase.com](https://supabase.com) 에서 새 프로젝트 생성
