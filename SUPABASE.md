@@ -4,6 +4,12 @@
 
 **Supabase만 DB에 쓰려면** 루트 `.env.local`에 `VITE_DATA_BACKEND=supabase` 를 넣으세요. ([`src/config.js`](src/config.js) — 이 값이면 `VITE_FIREBASE_*`가 있어도 Firestore 데이터 경로는 사용하지 않습니다.) **GitHub Pages** 워크플로는 기본 **`VITE_DATA_BACKEND=auto`** 이며, Firebase 시크릿이 있으면 Firestore가 우선입니다. ([FIRESTORE.md](FIRESTORE.md))
 
+## Supabase CLI (선택)
+
+1. 루트에서 `npm install` 후 **`npm run supabase -- login --token <PAT>`** 또는 대시보드 **Account → Access Tokens**에서 발급한 토큰을 `.env.local`의 `SUPABASE_ACCESS_TOKEN`에 넣고 CI/스크립트에서 사용합니다.
+2. **`npx supabase init`** 으로 [`supabase/config.toml`](supabase/config.toml)이 생성됩니다(이 저장소에 반영됨).
+3. 원격 DB와 링크: **`npm run supabase -- link --project-ref <Project ID>`** — ID는 **Project Settings → General → Reference ID** (URL의 `https://xxxx.supabase.co` 의 `xxxx`와 다를 수 있음). DB 비밀번호를 물으면 **Database password**를 입력합니다. `Resource has been removed` 오류는 ref가 잘못됐거나 프로젝트가 삭제된 경우입니다.
+
 ## 1. Supabase 프로젝트 만들기
 
 1. [supabase.com](https://supabase.com) 에서 새 프로젝트 생성

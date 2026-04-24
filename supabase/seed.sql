@@ -1,0 +1,1 @@
+-- 선택 시드 데이터 없음 (supabase db reset 시 빈 파일로 통과)
