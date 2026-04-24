@@ -1,4 +1,4 @@
-# .env.local 의 VITE_SUPABASE_* 를 GitHub Actions 저장소 시크릿으로 등록합니다.
+# .env.local 의 VITE_* 를 GitHub Actions 저장소 시크릿으로 등록합니다.
 # 사전: GitHub CLI 설치 후 한 번 `gh auth login` 실행
 $ErrorActionPreference = "Stop"
 $gh = "${env:ProgramFiles}\GitHub CLI\gh.exe"
@@ -10,15 +10,22 @@ if (-not (Test-Path $envFile)) {
   Write-Error ".env.local 이 없습니다."
 }
 
-$url = $null
-$key = $null
+$vars = @{}
 Get-Content $envFile -Encoding UTF8 | ForEach-Object {
   $line = ($_ -split '#', 2)[0].Trim()
-  if ($line -match '^\s*VITE_SUPABASE_URL\s*=\s*(.+)$') { $url = $matches[1].Trim().Trim('"').Trim("'") }
-  if ($line -match '^\s*VITE_SUPABASE_ANON_KEY\s*=\s*(.+)$') { $key = $matches[1].Trim().Trim('"').Trim("'") }
+  if ($line -match '^\s*(VITE_[A-Z0-9_]+)\s*=\s*(.+)$') {
+    $name = $matches[1]
+    $val = $matches[2].Trim().Trim('"').Trim("'")
+    if ($val) { $vars[$name] = $val }
+  }
 }
-if (-not $url -or -not $key) {
-  Write-Error ".env.local 에 VITE_SUPABASE_URL 과 VITE_SUPABASE_ANON_KEY 가 필요합니다."
+
+$requiredFb = @('VITE_FIREBASE_API_KEY', 'VITE_FIREBASE_PROJECT_ID', 'VITE_FIREBASE_APP_ID')
+$hasFirebase = ($requiredFb | ForEach-Object { $vars.ContainsKey($_) -and $vars[$_] }) -notcontains $false
+$hasSupabase = $vars.ContainsKey('VITE_SUPABASE_URL') -and $vars.ContainsKey('VITE_SUPABASE_ANON_KEY') -and $vars['VITE_SUPABASE_URL'] -and $vars['VITE_SUPABASE_ANON_KEY']
+
+if (-not $hasFirebase -and -not $hasSupabase) {
+  Write-Error ".env.local 에 Supabase(VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY) 또는 Firestore(VITE_FIREBASE_*) 가 필요합니다."
 }
 
 $prevErr = $ErrorActionPreference
@@ -40,6 +47,12 @@ if ($remote -match "github\.com[:/]([^/]+)/([^/.]+)") {
 }
 
 Write-Host "저장소: $repo"
-& $gh secret set VITE_SUPABASE_URL --body $url -R $repo
-& $gh secret set VITE_SUPABASE_ANON_KEY --body $key -R $repo
-Write-Host "완료: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY 가 Actions 시크릿에 등록되었습니다."
+foreach ($pair in $vars.GetEnumerator()) {
+  $n = $pair.Key
+  if ($n -notmatch '^VITE_') { continue }
+  if ($n -match '^VITE_FIREBASE_' -or $n -match '^VITE_SUPABASE_' -or $n -eq 'VITE_BASE_PATH' -or $n -eq 'VITE_DATA_BACKEND') {
+    Write-Host "secret set $n"
+    & $gh secret set $n --body $pair.Value -R $repo
+  }
+}
+Write-Host "완료: .env.local 의 VITE_* (Supabase/Firebase/BASE_PATH/DATA_BACKEND) 가 등록되었습니다(해당 키가 있을 때)."

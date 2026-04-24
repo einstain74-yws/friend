@@ -25,3 +25,6 @@ dist-ssr
 
 # SQLite (클래스 API 로컬 실행 시)
 server/data/
+
+# 로컬 API 환경 변수
+server/.env

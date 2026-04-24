@@ -1,6 +1,7 @@
 # 학급 교우 관계 분석기 (React + Vite)
 
-클라우드 동기화는 **Supabase** 를 사용합니다. 설정은 [SUPABASE.md](SUPABASE.md) 를 참고하세요.
+클라우드 동기화는 **Supabase(Postgres)** 를 기본으로 씁니다. ([SUPABASE.md](SUPABASE.md))  
+`VITE_DATA_BACKEND=supabase`(기본 권장)이면 Firebase env가 있어도 **DB는 Supabase만** 사용합니다. Firestore는 [FIRESTORE.md](FIRESTORE.md) 참고.
 
 ---
 

@@ -1,0 +1,11 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /class_sessions/{sessionId} {
+      allow read, write: if true;
+      match /responses/{authorId} {
+        allow read, write: if true;
+      }
+    }
+  }
+}

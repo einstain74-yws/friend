@@ -3,7 +3,7 @@ import { LogIn, UserPlus, LogOut, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 
 export default function AuthPanel({ compact = false }) {
-  const { user, loading, cloud, signIn, signUp, signOut } = useAuth();
+  const { user, loading, hasAuth, signIn, signUp, signOut } = useAuth();
   const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -12,7 +12,7 @@ export default function AuthPanel({ compact = false }) {
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
 
-  if (!cloud) {
+  if (!hasAuth) {
     return (
       <div
         style={{
@@ -25,7 +25,8 @@ export default function AuthPanel({ compact = false }) {
           maxWidth: compact ? 260 : 320,
         }}
       >
-        클라우드 계정은 <strong>VITE_SUPABASE_*</strong> 설정 후 사용할 수 있습니다.
+        이메일 로그인은 <strong>VITE_SUPABASE_*</strong>(<code>VITE_DATA_BACKEND=supabase</code>일 때) 또는 Firebase
+        설정(<code>auto</code>/<code>firestore</code> 모드) 시 사용할 수 있습니다. (설문·명단만 쓰는 경우는 선택)
       </div>
     );
   }

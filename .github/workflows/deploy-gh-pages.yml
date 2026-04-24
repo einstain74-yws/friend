@@ -30,6 +30,8 @@ jobs:
 
       - name: Build
         env:
+          VITE_BASE_PATH: /friend/
+          VITE_DATA_BACKEND: supabase
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: npm run build

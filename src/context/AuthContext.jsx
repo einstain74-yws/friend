@@ -1,48 +1,65 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { isCloudEnabled } from '../config.js';
+import { onAuthStateChanged } from 'firebase/auth';
+import { isFirestoreEnabled, isRemoteAuthEnabled, isSupabaseEnabled } from '../config.js';
 import { getSupabaseClient } from '../lib/supabaseClient.js';
+import { getFirebaseAuth } from '../lib/firebaseApp.js';
 import * as authApi from '../api/authApi.js';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const cloud = isCloudEnabled();
+  const hasAuth = isRemoteAuthEnabled();
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(cloud);
+  const [loading, setLoading] = useState(hasAuth);
 
   useEffect(() => {
-    if (!cloud) {
+    if (!hasAuth) {
       setLoading(false);
       return;
     }
-    const sb = getSupabaseClient();
-    if (!sb) {
-      setLoading(false);
-      return;
+    if (isFirestoreEnabled()) {
+      const auth = getFirebaseAuth();
+      if (!auth) {
+        setLoading(false);
+        return;
+      }
+      const unsub = onAuthStateChanged(auth, (u) => {
+        setUser(u);
+        setLoading(false);
+      });
+      return () => unsub();
     }
-    let cancelled = false;
-    sb.auth.getSession().then(({ data: { session } }) => {
-      if (!cancelled) {
+    if (isSupabaseEnabled()) {
+      const sb = getSupabaseClient();
+      if (!sb) {
+        setLoading(false);
+        return;
+      }
+      let cancelled = false;
+      sb.auth.getSession().then(({ data: { session } }) => {
+        if (cancelled) return;
         setUser(session?.user ?? null);
         setLoading(false);
-      }
-    });
-    const {
-      data: { subscription },
-    } = sb.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-    return () => {
-      cancelled = true;
-      subscription.unsubscribe();
-    };
-  }, [cloud]);
+      });
+      const {
+        data: { subscription },
+      } = sb.auth.onAuthStateChange((_event, session) => {
+        setUser(session?.user ?? null);
+      });
+      return () => {
+        cancelled = true;
+        subscription.unsubscribe();
+      };
+    }
+    setLoading(false);
+  }, [hasAuth]);
 
   const value = useMemo(
     () => ({
       user,
       loading,
-      cloud,
+      /** 이메일 인증 쓰는 백엔드 있음 (Firebase/Supabase) */
+      hasAuth: hasAuth,
       async signUp(email, password) {
         return authApi.signUp(email, password);
       },
@@ -53,7 +70,7 @@ export function AuthProvider({ children }) {
         return authApi.signOut();
       },
     }),
-    [user, loading, cloud],
+    [user, loading, hasAuth],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

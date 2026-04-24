@@ -2,6 +2,8 @@
 
 앱이 **같은 Supabase 프로젝트**만 바라보면, 선생님 PC·학생 폰 등 어디서 접속해도 같은 명단·설문 결과를 볼 수 있습니다.
 
+**Supabase만 DB에 쓰려면** 루트 `.env.local`에 `VITE_DATA_BACKEND=supabase` 를 넣으세요. ([`src/config.js`](src/config.js) — 이 값이면 `VITE_FIREBASE_*`가 있어도 Firestore 데이터 경로는 사용하지 않습니다.) GitHub Actions 배포는 기본으로 `VITE_DATA_BACKEND=supabase` 로 빌드합니다.
+
 ## 1. Supabase 프로젝트 만들기
 
 1. [supabase.com](https://supabase.com) 에서 새 프로젝트 생성
@@ -68,7 +70,7 @@ npm run dev
 
 ## 4. GitHub Pages 배포
 
-워크플로는 `secrets.VITE_SUPABASE_URL`, `secrets.VITE_SUPABASE_ANON_KEY` 를 빌드에 넣습니다. 아래 **한 가지**만 하면 됩니다.
+워크플로는 `VITE_DATA_BACKEND=supabase` 로 빌드하며, `secrets.VITE_SUPABASE_URL`, `secrets.VITE_SUPABASE_ANON_KEY` 를 넣습니다.
 
 **브라우저:** 저장소 **Settings → Secrets and variables → Actions → New repository secret** 에 각각 추가합니다.
 
@@ -77,13 +79,15 @@ npm run dev
 | `VITE_SUPABASE_URL` | `.env.local` 의 값과 동일 (Project URL) |
 | `VITE_SUPABASE_ANON_KEY` | `.env.local` 의 값과 동일 |
 
+(Firebase 시크릿은 넣지 않아도 됩니다. 넣어도 `VITE_DATA_BACKEND=supabase` 이면 DB에는 사용되지 않습니다.)
+
 **터미널 (GitHub CLI):** 한 번 `gh auth login` 한 뒤, 프로젝트 루트에서:
 
 ```powershell
 npm run gh:secrets
 ```
 
-([`scripts/push-github-secrets.ps1`](scripts/push-github-secrets.ps1) 이 `.env.local` 을 읽어 위 두 시크릿을 등록합니다.)
+([`scripts/push-github-secrets.ps1`](scripts/push-github-secrets.ps1) 이 `.env.local` 을 읽어 `VITE_SUPABASE_*`·`VITE_DATA_BACKEND` 등을 등록합니다.)
 
 `main` 에 푸시하면 워크플로가 위 값으로 `npm run build` 하며, 배포된 사이트가 Supabase를 사용합니다.
 

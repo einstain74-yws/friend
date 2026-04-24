@@ -1,0 +1,45 @@
+// SQLite + Prisma — 학생 설문 결과는 SurveyResponse.payload(JSON)에 저장됩니다.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// 서버 세션 (클래스)
+model Session {
+  id        String   @id
+  createdAt DateTime @default(now()) @map("created_at")
+
+  roster    Roster?
+  responses SurveyResponse[]
+
+  @@map("sessions")
+}
+
+/// 학생 명단 JSON 배열 [{ id, name }, ...]
+model Roster {
+  sessionId String @id @map("session_id")
+  students  Json   @map("data")
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("roster")
+}
+
+/// 학생 1인분 설문 제출 (authorId, q1~q10 등 전체)
+model SurveyResponse {
+  sessionId String @map("session_id")
+  authorId  String @map("author_id")
+  payload   Json   @map("data")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@id([sessionId, authorId])
+  @@map("survey_responses")
+}

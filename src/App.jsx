@@ -104,7 +104,7 @@ function App() {
       } catch (e) {
         console.error(e);
         alert(
-          'Supabase에서 데이터를 불러오지 못했습니다. VITE_SUPABASE_URL·VITE_SUPABASE_ANON_KEY와 SQL 마이그레이션을 확인하세요.'
+          '클라우드에서 데이터를 불러오지 못했습니다. VITE_FIREBASE_* (Firestore) 또는 VITE_SUPABASE_* 와 Supabase SQL 마이그레이션을 확인하세요.'
         );
       } finally {
         setCloudReady(true);
@@ -203,7 +203,7 @@ function App() {
       try {
         await cloudApi.postResponse(sessionId, surveyData);
       } catch {
-        alert('Supabase에 저장하지 못했습니다. 네트워크를 확인해 주세요.');
+        alert('클라우드에 저장하지 못했습니다. 네트워크와 Firestore/Supabase 설정을 확인해 주세요.');
         return;
       }
     }
@@ -262,10 +262,12 @@ function App() {
       await cloudApi.putRoster(id, students);
       await cloudApi.putResponses(id, responses);
       alert(
-        '클라우드 클래스가 생성되었습니다. 학생용 QR·링크는 짧은 주소(?session=)로 생성되며, 제출 내용이 Supabase에 모입니다.'
+        '클라우드 클래스가 생성되었습니다. 학생용 QR·링크는 짧은 주소(?session=)로 생성되며, 제출 내용이 클라우드(Firestore 등)에 모입니다.'
       );
     } catch (e) {
-      alert(e.message || '세션을 만들 수 없습니다. Supabase URL·키·SQL 마이그레이션을 확인하세요.');
+      alert(
+        e.message || '세션을 만들 수 없습니다. VITE_FIREBASE_* / VITE_SUPABASE_* 와 DB·보안 규칙을 확인하세요.',
+      );
     }
   };
 
@@ -346,10 +348,6 @@ function App() {
   if (view === 'home') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--background)', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-        <div style={{ position: 'absolute', top: '2rem', left: '2rem', zIndex: 5 }}>
-          <AuthPanel />
-        </div>
-
         <button 
           onClick={() => setShowQR(true)}
           style={{ position: 'absolute', top: '2rem', right: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'white', padding: '0.75rem 1.25rem', borderRadius: '12px', cursor: 'pointer', border: '1px solid var(--border)', boxShadow: 'var(--shadow-md)', color: 'var(--text-main)', fontWeight: 'bold' }}
