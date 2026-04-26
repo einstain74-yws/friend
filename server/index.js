@@ -89,6 +89,41 @@ app.post('/api/sessions', async (req, res) => {
   }
 });
 
+/** GET 교사용 비밀번호(로컬 API). 없으면 null */
+app.get('/api/sessions/:sessionId/settings', async (req, res) => {
+  try {
+    const row = await prisma.classSession.findUnique({
+      where: { id: req.params.sessionId },
+      select: { adminPassword: true },
+    });
+    if (!row) return res.status(404).json({ error: '세션을 찾을 수 없습니다.' });
+    res.json({ adminPassword: row.adminPassword ?? null });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message || '설정 조회 실패' });
+  }
+});
+
+/** PUT 교사용 비밀번호 저장 */
+app.put('/api/sessions/:sessionId/settings', async (req, res) => {
+  try {
+    const { adminPassword } = req.body;
+    if (adminPassword == null || typeof adminPassword !== 'string') {
+      return res.status(400).json({ error: 'adminPassword 문자열이 필요합니다.' });
+    }
+    const ex = await prisma.classSession.findUnique({ where: { id: req.params.sessionId } });
+    if (!ex) return res.status(404).json({ error: '세션을 찾을 수 없습니다.' });
+    await prisma.classSession.update({
+      where: { id: req.params.sessionId },
+      data: { adminPassword },
+    });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message || '설정 저장 실패' });
+  }
+});
+
 app.get('/api/sessions/:sessionId/roster', async (req, res) => {
   try {
     const row = await prisma.roster.findUnique({

@@ -107,6 +107,74 @@ export async function createSession() {
   throw new Error('VITE_API_BASE_URL, VITE_FIREBASE_*, 또는 VITE_SUPABASE_* 를 설정하세요.');
 }
 
+/**
+ * 서버에 저장된 교사용(대시보드) 비밀번호. 없으면 null → 앱에서 기본값(0000) 사용.
+ * @param {string} sessionId
+ * @returns {Promise<string | null>}
+ */
+export async function fetchAdminPassword(sessionId) {
+  if (shouldUseLocalApi()) {
+    const data = await fetchJson(
+      apiUrl(`/api/sessions/${encodeURIComponent(sessionId)}/settings`)
+    );
+    const v = data?.adminPassword;
+    return typeof v === 'string' && v.length > 0 ? v : null;
+  }
+  if (shouldUseFirestore()) {
+    const db = getDb();
+    const snap = await getDoc(sessionDocRef(db, sessionId));
+    if (!snap.exists()) return null;
+    const v = snap.data()?.adminPassword;
+    return typeof v === 'string' && v.length > 0 ? v : null;
+  }
+  if (shouldUseSupabase()) {
+    const sb = getSb();
+    const { data, error } = await sb
+      .from('class_sessions')
+      .select('admin_password')
+      .eq('id', sessionId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    const v = data?.admin_password;
+    return typeof v === 'string' && v.length > 0 ? v : null;
+  }
+  throw new Error('서버 동기화가 설정되지 않았습니다.');
+}
+
+/**
+ * @param {string} sessionId
+ * @param {string} adminPassword
+ */
+export async function putAdminPassword(sessionId, adminPassword) {
+  const pw = String(adminPassword ?? '');
+  if (shouldUseLocalApi()) {
+    await fetchJson(apiUrl(`/api/sessions/${encodeURIComponent(sessionId)}/settings`), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminPassword: pw }),
+    });
+    return;
+  }
+  if (shouldUseFirestore()) {
+    const db = getDb();
+    const ref = sessionDocRef(db, sessionId);
+    const snap = await getDoc(ref);
+    if (snap.exists()) {
+      await updateDoc(ref, { adminPassword: pw });
+    } else {
+      await setDoc(ref, { createdAt: serverTimestamp(), adminPassword: pw });
+    }
+    return;
+  }
+  if (shouldUseSupabase()) {
+    const sb = getSb();
+    const { error } = await sb.from('class_sessions').update({ admin_password: pw }).eq('id', sessionId);
+    if (error) throw new Error(error.message);
+    return;
+  }
+  throw new Error('서버 동기화가 설정되지 않습니다.');
+}
+
 export async function fetchRoster(sessionId) {
   if (shouldUseLocalApi()) {
     const data = await fetchJson(apiUrl(`/api/sessions/${encodeURIComponent(sessionId)}/roster`));

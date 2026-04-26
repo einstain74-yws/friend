@@ -97,9 +97,27 @@ function App() {
     localStorage.setItem(LS_SESSION, sid);
     (async () => {
       try {
-        const [st, resp] = await Promise.all([cloudApi.fetchRoster(sid), cloudApi.fetchResponses(sid)]);
+        const [st, resp, remotePw] = await Promise.all([
+          cloudApi.fetchRoster(sid),
+          cloudApi.fetchResponses(sid),
+          cloudApi.fetchAdminPassword(sid).catch((err) => {
+            console.error(err);
+            return null;
+          }),
+        ]);
         setStudents(st);
         setResponses(resp);
+        // 교사용 비밀번호: 서버(Supabase/Firestore/로컬 API)에 있으면 그걸 쓰고, 없으면 이 기기 localStorage → 기기 간 맞추기 위해 첫 기기의 값을 서버에 올림
+        const fromLs = localStorage.getItem('sociogram_admin_pw') || '0000';
+        if (remotePw != null && String(remotePw).length > 0) {
+          setAdminPassword(String(remotePw));
+          localStorage.setItem('sociogram_admin_pw', String(remotePw));
+        } else {
+          setAdminPassword(fromLs);
+          if (fromLs && fromLs !== '0000') {
+            cloudApi.putAdminPassword(sid, fromLs).catch((e) => console.warn('교사 비밀번호를 서버에 맞춤 저장하지 못했습니다.', e));
+          }
+        }
       } catch (e) {
         console.error(e);
         alert(
@@ -138,6 +156,25 @@ function App() {
     const id = setInterval(poll, 12000);
     return () => clearInterval(id);
   }, [view, sessionId, activeHistoryId]);
+
+  /** 탭/앱을 다시 켤 때 서버에 저장된 교사 비밀번호를 가져와 다른 기기에서 바꾼 값과 맞춤 */
+  useEffect(() => {
+    if (!isCloudEnabled() || !sessionId) return;
+    const syncPw = () => {
+      if (document.visibilityState !== 'visible') return;
+      cloudApi
+        .fetchAdminPassword(sessionId)
+        .then((remote) => {
+          if (remote != null && String(remote).length > 0) {
+            setAdminPassword(String(remote));
+            localStorage.setItem('sociogram_admin_pw', String(remote));
+          }
+        })
+        .catch((e) => console.warn('교사 비밀번호 갱신', e));
+    };
+    document.addEventListener('visibilitychange', syncPw);
+    return () => document.removeEventListener('visibilitychange', syncPw);
+  }, [sessionId]);
 
   const addStudent = (name) => {
     if (!name.trim()) return;
@@ -283,11 +320,23 @@ function App() {
     }
   };
 
-  const handleChangePassword = () => {
+  const handleChangePassword = async () => {
     const currentPw = prompt('현재 비밀번호를 입력하세요.');
     if (currentPw === adminPassword) {
       const newPw = prompt('새로운 비밀번호를 입력하세요.');
       if (newPw) {
+        if (isCloudEnabled() && sessionId) {
+          try {
+            await cloudApi.putAdminPassword(sessionId, newPw);
+          } catch (e) {
+            console.error(e);
+            alert(
+              e?.message ||
+                '서버에 비밀번호를 저장하지 못했습니다. Supabase `admin_password` 열(마이그레이션 004)과 네트워크를 확인하세요. 다른 기기에 반영되지 않을 수 있습니다.'
+            );
+            return;
+          }
+        }
         setAdminPassword(newPw);
         localStorage.setItem('sociogram_admin_pw', newPw);
         alert('비밀번호가 변경되었습니다.');
