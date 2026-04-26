@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Users, FileText, Lock, ArrowLeft, ShieldCheck, QrCode, Trash2, Link2, Cloud } from 'lucide-react';
+import { Users, FileText, Lock, ArrowLeft, ShieldCheck, QrCode, Trash2, Link2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import StudentManager from './components/StudentManager';
 import SociogramNetwork from './components/SociogramNetwork';
@@ -259,39 +259,6 @@ function App() {
     }
   };
 
-  const handleCreateCloudSession = async () => {
-    try {
-      const { id } = await cloudApi.createSession();
-      setSessionId(id);
-      localStorage.setItem(LS_SESSION, id);
-      await cloudApi.putRoster(id, students);
-      await cloudApi.putResponses(id, responses);
-      alert(
-        '클라우드 클래스가 생성되었습니다. 학생용 QR·링크는 짧은 주소(?session=)로 생성되며, 제출 내용이 클라우드(Firestore 등)에 모입니다.'
-      );
-    } catch (e) {
-      alert(
-        e.message || '세션을 만들 수 없습니다. VITE_FIREBASE_* / VITE_SUPABASE_* 와 DB·보안 규칙을 확인하세요.',
-      );
-    }
-  };
-
-  const handleJoinCloudSession = async () => {
-    const raw = window.prompt('연결할 세션 ID를 붙여 넣으세요. (다른 PC에서 복사)');
-    if (!raw?.trim()) return;
-    const id = raw.trim();
-    try {
-      const [st, resp] = await Promise.all([cloudApi.fetchRoster(id), cloudApi.fetchResponses(id)]);
-      setSessionId(id);
-      localStorage.setItem(LS_SESSION, id);
-      setStudents(st);
-      setResponses(resp);
-      alert('서버 데이터를 불러왔습니다.');
-    } catch {
-      alert('세션을 찾을 수 없거나 서버 오류입니다.');
-    }
-  };
-
   const handleRemoveHistory = (e, idToDelete) => {
     e.stopPropagation();
     if (window.confirm('이 과거 설문 기록을 정말로 삭제하시겠습니까?\n(삭제 후에는 복구할 수 없습니다)')) {
@@ -517,46 +484,6 @@ function App() {
                 onRemove={removeStudent}
                 onClearAll={clearAllStudents}
               />
-              {isCloudEnabled() && (
-                <div className="panel-section" style={{ borderBottom: 'none' }}>
-                  <h2 className="panel-title" style={{ alignItems: 'center', gap: '0.35rem' }}>
-                    <Cloud size={18} />
-                    클라우드 (서버 동기화)
-                  </h2>
-                  {sessionId ? (
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem', lineHeight: 1.45 }}>
-                      세션 ID가 저장되어 있습니다. 명단·설문 제출이 같은 서버에 모이며, 다른 컴퓨터에서도{' '}
-                      <strong>세션 ID로 연결</strong>하면 같은 결과를 볼 수 있습니다.
-                      <br />
-                      <code style={{ fontSize: '0.7rem', wordBreak: 'break-all' }}>{sessionId}</code>
-                    </p>
-                  ) : (
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem', lineHeight: 1.45 }}>
-                      새로 만들면 학생용 링크가 <code>?session=</code> 한 줄로 짧아지고, 제출 데이터가 서버에 쌓입니다.
-                    </p>
-                  )}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    {!sessionId && (
-                      <button
-                        type="button"
-                        className="btn btn-primary"
-                        style={{ width: '100%' }}
-                        onClick={handleCreateCloudSession}
-                      >
-                        새 클라우드 클래스 만들기
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className="btn"
-                      style={{ width: '100%', border: '1px solid var(--border)', background: 'var(--background)' }}
-                      onClick={handleJoinCloudSession}
-                    >
-                      세션 ID로 연결 (다른 PC)
-                    </button>
-                  </div>
-                </div>
-              )}
             </>
           ) : (
             <div className="panel-section">
