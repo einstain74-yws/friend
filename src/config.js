@@ -67,11 +67,3 @@ export function isServerSyncEnabled() {
 export function isCloudEnabled() {
   return isServerSyncEnabled();
 }
-
-/** 이메일 로그인(Firebase 또는 Supabase) 사용 가능 */
-export function isRemoteAuthEnabled() {
-  if (getDataBackend() === 'supabase') {
-    return isSupabaseEnabled();
-  }
-  return isFirestoreEnabled() || isSupabaseEnabled();
-}

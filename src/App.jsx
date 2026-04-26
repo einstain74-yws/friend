@@ -8,7 +8,6 @@ import SurveyForm from './components/SurveyForm';
 import { decodeRosterFromLocation, buildStudentAccessUrl, stripRosterFromAddressBar } from './utils/rosterUrl';
 import { isCloudEnabled } from './config.js';
 import * as cloudApi from './api/cloudApi.js';
-import AuthPanel from './components/AuthPanel.jsx';
 
 const LS_SESSION = 'sociogram_cloud_session_id';
 
@@ -484,7 +483,6 @@ function App() {
             : `과거 기록: ${surveyHistory.find(h => h.id === activeHistoryId)?.title || '알 수 없음'}`}
         </h1>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          <AuthPanel compact />
           <button className="btn" style={{ background: 'var(--background)', border: '1px solid var(--border)' }} onClick={handleChangePassword}>
             <Lock size={18} />
             비밀번호 변경

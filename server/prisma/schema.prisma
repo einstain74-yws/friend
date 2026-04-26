@@ -1,4 +1,4 @@
-// SQLite + Prisma — 학생 설문 결과는 SurveyResponse.payload(JSON)에 저장됩니다.
+// SQLite + Prisma — 교실 세션·명단·설문(레거시 JSON + 문항별 Answer)·User 인증
 
 generator client {
   provider = "prisma-client-js"
@@ -9,13 +9,63 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// 서버 세션 (클래스)
-model Session {
-  id        String   @id
+enum Role {
+  TEACHER
+  STUDENT
+}
+
+/// 설문 문항 키 (앱의 q1~q10과 대응)
+enum QuestionKey {
+  Q1
+  Q2
+  Q3
+  Q4
+  Q5
+  Q6
+  Q7
+  Q8
+  Q9
+  Q10
+}
+
+/// 교사/관리자 등 로그인 계정 (비밀번호 검증은 Express에서 bcrypt 등으로 처리)
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         Role     @default(STUDENT)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  authSessions    UserAuthSession[]
+  teachingSessions ClassSession[] @relation("TeacherSessions")
+
+  @@map("users")
+}
+
+/// 서버 발급 로그인 세션(리프레시·세션 토큰 등 저장용)
+model UserAuthSession {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  tokenHash String   @map("token_hash")
+  expiresAt DateTime @map("expires_at")
   createdAt DateTime @default(now()) @map("created_at")
 
-  roster    Roster?
-  responses SurveyResponse[]
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_auth_sessions")
+}
+
+/// 교실 세션 (클라우드 클래스 1개)
+model ClassSession {
+  id        String   @id
+  teacherId String?  @map("teacher_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  teacher User? @relation("TeacherSessions", fields: [teacherId], references: [id], onDelete: SetNull)
+
+  roster      Roster?
+  responses   SurveyResponse[]
+  submissions SurveySubmission[]
 
   @@map("sessions")
 }
@@ -25,12 +75,12 @@ model Roster {
   sessionId String @id @map("session_id")
   students  Json   @map("data")
 
-  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  session ClassSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@map("roster")
 }
 
-/// 학생 1인분 설문 제출 (authorId, q1~q10 등 전체)
+/// 레거시: 설문 전체를 JSON 한 덩어리로 저장 (기존 API 호환). 신규 제출 시 Answer와 동기화 권장.
 model SurveyResponse {
   sessionId String @map("session_id")
   authorId  String @map("author_id")
@@ -38,8 +88,34 @@ model SurveyResponse {
 
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  session ClassSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@id([sessionId, authorId])
   @@map("survey_responses")
+}
+
+/// 학생 1명의 설문 제출 단위 (명단의 authorId = authorStudentId)
+model SurveySubmission {
+  sessionId       String   @map("session_id")
+  authorStudentId String  @map("author_student_id")
+  submittedAt     DateTime @default(now()) @map("submitted_at")
+
+  session ClassSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  answers Answer[]
+
+  @@id([sessionId, authorStudentId])
+  @@map("survey_submissions")
+}
+
+/// 문항별 답변 — value: q1~q5는 string[] JSON, q6~q9는 number, q10은 string
+model Answer {
+  sessionId       String       @map("session_id")
+  authorStudentId String       @map("author_student_id")
+  question        QuestionKey
+  value           Json
+
+  submission SurveySubmission @relation(fields: [sessionId, authorStudentId], references: [sessionId, authorStudentId], onDelete: Cascade)
+
+  @@id([sessionId, authorStudentId, question])
+  @@map("survey_answers")
 }
