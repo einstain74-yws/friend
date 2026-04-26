@@ -142,7 +142,7 @@ function App() {
   const addStudent = (name) => {
     if (!name.trim()) return;
     const newStudent = { id: Date.now().toString(), name: name.trim() };
-    setStudents([...students, newStudent]);
+    setStudents((prev) => [...prev, newStudent]);
   };
 
   const addMultipleStudents = (names) => {
@@ -158,15 +158,19 @@ function App() {
   };
 
   const removeStudent = (id) => {
-    setStudents(students.filter(s => s.id !== id));
-    setResponses(responses.filter(r => r.authorId !== id).map(r => ({
-      ...r,
-      q1: r.q1.filter(x => x !== id),
-      q2: r.q2.filter(x => x !== id),
-      q3: r.q3.filter(x => x !== id),
-      q4: r.q4.filter(x => x !== id),
-      q5: r.q5.filter(x => x !== id)
-    })));
+    setStudents((prev) => prev.filter((s) => s.id !== id));
+    setResponses((prev) =>
+      prev
+        .filter((r) => r.authorId !== id)
+        .map((r) => ({
+          ...r,
+          q1: r.q1.filter((x) => x !== id),
+          q2: r.q2.filter((x) => x !== id),
+          q3: r.q3.filter((x) => x !== id),
+          q4: r.q4.filter((x) => x !== id),
+          q5: r.q5.filter((x) => x !== id),
+        })),
+    );
   };
 
   const clearAllStudents = () => {
@@ -206,8 +210,10 @@ function App() {
         return;
       }
     }
-    const newResponses = responses.filter((r) => r.authorId !== surveyData.authorId);
-    setResponses([...newResponses, surveyData]);
+    setResponses((prev) => {
+      const next = prev.filter((r) => r.authorId !== surveyData.authorId);
+      return [...next, surveyData];
+    });
     setView('home');
   };
 
@@ -483,9 +489,15 @@ function App() {
             : `과거 기록: ${surveyHistory.find(h => h.id === activeHistoryId)?.title || '알 수 없음'}`}
         </h1>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          <button className="btn" style={{ background: 'var(--background)', border: '1px solid var(--border)' }} onClick={handleChangePassword}>
+          <button
+            type="button"
+            className="btn"
+            style={{ background: 'var(--background)', border: '1px solid var(--border)' }}
+            onClick={handleChangePassword}
+            title="교사용 화면 진입 시 묻는 비밀번호를 바꿉니다 (계정 로그인 아님)"
+          >
             <Lock size={18} />
-            비밀번호 변경
+            교사 접속 비밀번호
           </button>
           <button className="btn" style={{ background: 'var(--background)', border: '1px solid var(--border)' }} onClick={() => setView('home')}>
             <ArrowLeft size={18} />
