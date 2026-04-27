@@ -40,10 +40,24 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
   const [view, setView] = useState('home'); // 'home' | 'teacher' | 'survey'
   const [showQR, setShowQR] = useState(false);
   const [adminPassword, setAdminPassword] = useState(() => {
+    /** 교사 /teacher/session/…: 전역이 다른 기기·다른 반 비번과 섞이지 않게 기본만 두고 loadFromCloud가 채움 */
+    if (initialSessionId && isCloudEnabled()) return '0000';
     return localStorage.getItem('sociogram_admin_pw') || '0000';
   });
   
   const [students, setStudents] = useState(() => {
+    if (initialSessionId && isCloudEnabled()) {
+      try {
+        const scoped = localStorage.getItem(`${LS_ROSTER_BY_SESSION}${initialSessionId}`);
+        if (scoped) {
+          const parsed = JSON.parse(scoped);
+          if (isValidRosterList(parsed)) return parsed;
+        }
+      } catch {
+        /* ignore */
+      }
+      return [];
+    }
     try {
       /** 다른 기기(학생 폰)에서는 localStorage가 비어 있음 → 주소의 명단(#r=) 우선 */
       const fromUrl = decodeRosterFromLocation();
@@ -60,11 +74,13 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
   });
 
   const [responses, setResponses] = useState(() => {
+    if (initialSessionId && isCloudEnabled()) return [];
     const saved = localStorage.getItem('sociogram_responses');
     return saved ? JSON.parse(saved) : [];
   });
 
   const [surveyHistory, setSurveyHistory] = useState(() => {
+    if (initialSessionId && isCloudEnabled()) return [];
     const saved = localStorage.getItem('sociogram_history');
     return saved ? JSON.parse(saved) : [];
   });
@@ -153,13 +169,16 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
           } catch {
             /* ignore */
           }
-          if (localStorage.getItem(LS_SESSION) === sid) {
-            try {
-              const raw2 = localStorage.getItem('sociogram_students');
-              const c2 = raw2 ? JSON.parse(raw2) : [];
-              if (isValidRosterList(c2)) return c2;
-            } catch {
-              /* ignore */
+          /** /teacher/session/… 직접 진입: 전역 sociogram_students는 예전에 연 다른 반이 섞이므로 쓰지 않음 */
+          if (!initialSessionId || initialSessionId !== sid) {
+            if (localStorage.getItem(LS_SESSION) === sid) {
+              try {
+                const raw2 = localStorage.getItem('sociogram_students');
+                const c2 = raw2 ? JSON.parse(raw2) : [];
+                if (isValidRosterList(c2)) return c2;
+              } catch {
+                /* ignore */
+              }
             }
           }
           return null;
@@ -195,7 +214,7 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
       setCloudRosterHydrated(false);
       throw e;
     }
-  }, []);
+  }, [initialSessionId]);
 
   const connectToSession = useCallback(
     async (id, onFailReset) => {
@@ -284,6 +303,9 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
         await loadFromCloud(sid);
         if (initialSessionId) {
           setView('teacher');
+        } else if (q) {
+          /** 주소창에 `?session=`으로 처음 들어온 경우(학생용 QR·공유 링크) → 설문 화면으로 */
+          setView('survey');
         }
       } catch (e) {
         console.error(e);
