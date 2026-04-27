@@ -886,14 +886,17 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
             <Lock size={18} />
             교사 접속 비밀번호
           </button>
-          <button
-            className="btn"
-            style={{ background: 'var(--background)', border: '1px solid var(--border)' }}
-            onClick={() => (onLeaveTeacher ? onLeaveTeacher() : setView('home'))}
-          >
-            <ArrowLeft size={18} />
-            {onLeaveTeacher ? '학급 목록으로' : '처음 화면으로'}
-          </button>
+          {onLeaveTeacher ? (
+            <button
+              type="button"
+              className="btn"
+              style={{ background: 'var(--background)', border: '1px solid var(--border)' }}
+              onClick={() => onLeaveTeacher()}
+            >
+              <ArrowLeft size={18} />
+              학급 목록으로
+            </button>
+          ) : null}
         </div>
       </header>
       
