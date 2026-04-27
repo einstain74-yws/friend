@@ -367,14 +367,15 @@ export async function createClassroomForTeacher(schoolName, grade, className) {
     throw new Error('VITE_SUPABASE만 사용하는 모드에서 지원됩니다.');
   }
   const sb = getSb();
-  const { data, error } = await sb.rpc('create_classroom_for_teacher', {
-    p_school_name: String(schoolName ?? ''),
-    p_grade: Number(grade),
-    p_class_name: String(className ?? ''),
-  });
+  const payload = {
+    school_name: String(schoolName ?? '').trim(),
+    grade: Number(grade),
+    class_name: String(className ?? '').trim(),
+  };
+  const { data, error } = await sb.rpc('create_classroom', { p_payload: payload });
   if (error) throw new Error(error.message);
   const row = data && typeof data === 'object' ? data : null;
-  if (!row?.session_id) throw new Error('학급 생성 응답이 올바르지 않습니다.');
+  if (!row?.session_id) throw new Error('학급 생성 응답이 올바르지 않습니다. DB에 supabase/migrations/006_*.sql 을 적용했는지 확인하세요.');
   return { session_id: row.session_id, classroom_id: row.classroom_id };
 }
 

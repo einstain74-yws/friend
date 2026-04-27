@@ -45,6 +45,8 @@ jobs:
       - name: Build
         env:
           VITE_BASE_PATH: /friend/
+          # Supabase 이메일 링크의 redirect_to: GitHub Pages 프로젝트 URL(저장소 owner 기준, 저장소명 friend 가정)
+          VITE_AUTH_REDIRECT_URL: ${{ format('https://{0}.github.io/friend/', github.repository_owner) }}
           # 저장소 기본: 클라우드 데이터는 Supabase만 (Firestore 경로 비활성화)
           VITE_DATA_BACKEND: supabase
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}

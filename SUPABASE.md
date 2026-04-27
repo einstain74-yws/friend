@@ -102,14 +102,26 @@ npm run gh:secrets
 
 `main` 에 푸시하면 워크플로가 `npm run build` 하며, 시크릿 구성에 따라 Firestore 또는 Supabase 경로가 선택됩니다.
 
-## 5. 교사 회원·학급 (`005_classrooms.sql`)
+## 5. 교사 회원·학급 (`005_classrooms.sql`, `006_…sql`)
 
-**`npm run db:apply`**(또는 SQL Editor)로 [`supabase/migrations/005_classrooms.sql`](supabase/migrations/005_classrooms.sql)을 **001~004 이후**에 적용합니다.
+**`npm run db:apply`**(또는 SQL Editor)로 아래를 **순서대로** 적용합니다.
+
+1. [`005_classrooms.sql`](supabase/migrations/005_classrooms.sql) — `classrooms` 테이블·RLS, RPC `create_classroom_for_teacher(text, int, text)`.
+2. [`006_create_classroom_jsonb_rpc.sql`](supabase/migrations/006_create_classroom_jsonb_rpc.sql) — 앱이 사용하는 **`create_classroom(jsonb)`** (한 덩어리 인자). PostgREST가 다인자 RPC를 못 찾는 오류가 나면 006이 필요합니다.
 
 - **`classrooms`**: `owner_id` → `auth.users`, `school_name`, `grade`(1–12), `class_name`, `session_id` → `class_sessions.id`(1:1, UNIQUE). **RLS**: 로그인한 본인(`auth.uid()`)의 행만 읽기/쓰기.
-- **RPC `create_classroom_for_teacher(text, int, text)`**: 인증된 교사만 실행. `class_sessions` 삽입 + `classrooms` 연결. 응답 JSON에 `session_id`, `classroom_id`.
+- **RPC `create_classroom(jsonb)`**: `p_payload`에 `school_name`, `grade`, `class_name`. 응답 JSON에 `session_id`, `classroom_id`.
 - **프론트**: `VITE_SUPABASE`만 사용·Firestore/로컬 API 미사용이면 `isSupabaseTeacherPortalEnabled()`가 true이고 `/auth/login`, `/auth/register`, `/teacher`가 활성화됩니다([`src/config.js`](src/config.js)).
-- **Authentication → URL configuration**: **Site URL**에 배포 루트(예: `https://<user>.github.io/friend/`)를 넣고, **Redirect URLs**에 같은 주소(와 로컬 `http://localhost:5173/`)를 추가하면 가입/리다이렉트가 맞습니다.
+
+### 이메일 인증 링크가 localhost:3000 등으로 열릴 때
+
+Supabase는 **Site URL**(기본값이 `http://localhost:3000`인 경우가 많음)로 돌려보냅니다. 아래를 맞추세요.
+
+1. **Authentication → URL configuration**
+   - **Site URL**: 배포 주소 예) `https://<github-아이디>.github.io/friend/`
+   - **Redirect URLs**: 위와 동일 URL, 개발용 `http://localhost:5173/**` (Vite), 필요 시 `http://127.0.0.1:5173/**`
+2. GitHub Actions 빌드는 `VITE_AUTH_REDIRECT_URL`로 동일 Pages URL을 넣습니다([`deploy-gh-pages.yml`](.github/workflows/deploy-gh-pages.yml)). 로컬은 [`getAuthEmailRedirectTo`](src/utils/siteUrl.js)가 현재 탭 주소를 씁니다.
+3. 설정을 바꾼 **뒤**에는 **새로** 회원가입을 보내야 메일 링크가 갱신됩니다(이미 온 메일은 옛 redirect).
 
 ## 보안 (MVP)
 
