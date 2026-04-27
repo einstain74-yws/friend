@@ -337,3 +337,59 @@ export async function putResponses(sessionId, responses) {
   }
   throw new Error('서버 동기화가 설정되지 않습니다.');
 }
+
+/**
+ * @typedef {{ id: string, owner_id: string, school_name: string, grade: number, class_name: string, session_id: string, created_at: string }} ClassroomRow
+ */
+
+/**
+ * 로그인한 교사의 학급 목록 (RLS: 본인 행만)
+ * @returns {Promise<ClassroomRow[]>}
+ */
+export async function listClassrooms() {
+  if (!shouldUseSupabase()) {
+    return [];
+  }
+  const sb = getSb();
+  const { data, error } = await sb
+    .from('classrooms')
+    .select('id, owner_id, school_name, grade, class_name, session_id, created_at')
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+/**
+ * @returns {Promise<{ session_id: string, classroom_id: string }>}
+ */
+export async function createClassroomForTeacher(schoolName, grade, className) {
+  if (!shouldUseSupabase()) {
+    throw new Error('VITE_SUPABASE만 사용하는 모드에서 지원됩니다.');
+  }
+  const sb = getSb();
+  const { data, error } = await sb.rpc('create_classroom_for_teacher', {
+    p_school_name: String(schoolName ?? ''),
+    p_grade: Number(grade),
+    p_class_name: String(className ?? ''),
+  });
+  if (error) throw new Error(error.message);
+  const row = data && typeof data === 'object' ? data : null;
+  if (!row?.session_id) throw new Error('학급 생성 응답이 올바르지 않습니다.');
+  return { session_id: row.session_id, classroom_id: row.classroom_id };
+}
+
+/**
+ * @param {string} sessionId
+ * @returns {Promise<ClassroomRow | null>}
+ */
+export async function getClassroomBySessionId(sessionId) {
+  if (!shouldUseSupabase()) return null;
+  const sb = getSb();
+  const { data, error } = await sb
+    .from('classrooms')
+    .select('id, owner_id, school_name, grade, class_name, session_id, created_at')
+    .eq('session_id', sessionId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data;
+}

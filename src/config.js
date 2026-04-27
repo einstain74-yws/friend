@@ -67,3 +67,10 @@ export function isServerSyncEnabled() {
 export function isCloudEnabled() {
   return isServerSyncEnabled();
 }
+
+/**
+ * Supabase 전용(교사 Auth·classrooms) — Firestore/로컬 API와 병행 시 UI 비노출
+ */
+export function isSupabaseTeacherPortalEnabled() {
+  return isSupabaseEnabled() && !isLocalApiEnabled() && !isFirestoreEnabled();
+}

@@ -102,10 +102,20 @@ npm run gh:secrets
 
 `main` 에 푸시하면 워크플로가 `npm run build` 하며, 시크릿 구성에 따라 Firestore 또는 Supabase 경로가 선택됩니다.
 
+## 5. 교사 회원·학급 (`005_classrooms.sql`)
+
+**`npm run db:apply`**(또는 SQL Editor)로 [`supabase/migrations/005_classrooms.sql`](supabase/migrations/005_classrooms.sql)을 **001~004 이후**에 적용합니다.
+
+- **`classrooms`**: `owner_id` → `auth.users`, `school_name`, `grade`(1–12), `class_name`, `session_id` → `class_sessions.id`(1:1, UNIQUE). **RLS**: 로그인한 본인(`auth.uid()`)의 행만 읽기/쓰기.
+- **RPC `create_classroom_for_teacher(text, int, text)`**: 인증된 교사만 실행. `class_sessions` 삽입 + `classrooms` 연결. 응답 JSON에 `session_id`, `classroom_id`.
+- **프론트**: `VITE_SUPABASE`만 사용·Firestore/로컬 API 미사용이면 `isSupabaseTeacherPortalEnabled()`가 true이고 `/auth/login`, `/auth/register`, `/teacher`가 활성화됩니다([`src/config.js`](src/config.js)).
+- **Authentication → URL configuration**: **Site URL**에 배포 루트(예: `https://<user>.github.io/friend/`)를 넣고, **Redirect URLs**에 같은 주소(와 로컬 `http://localhost:5173/`)를 추가하면 가입/리다이렉트가 맞습니다.
+
 ## 보안 (MVP)
 
-- RLS는 **anon** 에 대해 해당 테이블 전체 접근을 허용합니다. **세션 UUID를 아는 사람**이 해당 반 데이터를 읽을 수 있다고 가정한 교실용 설정입니다.
-- 공개 저장소에 키를 넣지 말고 **GitHub Secrets** 만 사용하세요.
+- `class_sessions` / `rosters` / `survey_responses` 쪽 RLS는 **anon**이 넓게 열려 있을 수 있습니다(기존). **세션 UUID를 아는 자**는 해당 반 응답·명단에 접근할 수 있다는 교실용 전제입니다. 학급 **메타**와 소유권은 `classrooms` RLS + 로그인으로 구분됩니다.
+- **교사**가 만든 세션은 `classrooms`로 연결·관리되며, **학생**은 계속 비로그인 + `?session=`만 사용합니다.
+- 공개 저장소에 키를 올리지 말고 **GitHub Secrets**만 사용하세요.
 
 ## Express 서버(`server/`)
 
