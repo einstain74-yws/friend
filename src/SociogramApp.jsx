@@ -79,6 +79,17 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
     return !(q || stored);
   });
 
+  /** 서버에서 명단을 첫 로드하기 전에는 putRoster를 막음(빈 명단으로 DB를 덮어쓰는 레이스 방지) */
+  const [cloudRosterHydrated, setCloudRosterHydrated] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    if (!isCloudEnabled()) return true;
+    const hasSession =
+      initialSessionId ||
+      new URLSearchParams(window.location.search).get('session') ||
+      localStorage.getItem(LS_SESSION);
+    return !hasSession;
+  });
+
   const rosterSyncTimer = useRef(null);
 
   const [connectInput, setConnectInput] = useState('');
@@ -112,32 +123,39 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
   }, [sessionId, user?.id]);
 
   const loadFromCloud = useCallback(async (sid) => {
-    const [st, resp, remotePw] = await Promise.all([
-      cloudApi.fetchRoster(sid),
-      cloudApi.fetchResponses(sid),
-      cloudApi.fetchAdminPassword(sid).catch((err) => {
-        console.error(err);
-        return null;
-      }),
-    ]);
-    setStudents(st);
-    setResponses(resp);
-    const fromLs = localStorage.getItem('sociogram_admin_pw') || '0000';
-    if (remotePw != null && String(remotePw).length > 0) {
-      setAdminPassword(String(remotePw));
-      localStorage.setItem('sociogram_admin_pw', String(remotePw));
-    } else {
-      setAdminPassword(fromLs);
-      if (fromLs && fromLs !== '0000') {
-        cloudApi.putAdminPassword(sid, fromLs).catch((e) => console.warn('교사 비밀번호를 서버에 맞춤 저장하지 못했습니다.', e));
+    setCloudRosterHydrated(false);
+    try {
+      const [st, resp, remotePw] = await Promise.all([
+        cloudApi.fetchRoster(sid),
+        cloudApi.fetchResponses(sid),
+        cloudApi.fetchAdminPassword(sid).catch((err) => {
+          console.error(err);
+          return null;
+        }),
+      ]);
+      setStudents(st);
+      setResponses(resp);
+      const fromLs = localStorage.getItem('sociogram_admin_pw') || '0000';
+      if (remotePw != null && String(remotePw).length > 0) {
+        setAdminPassword(String(remotePw));
+        localStorage.setItem('sociogram_admin_pw', String(remotePw));
+      } else {
+        setAdminPassword(fromLs);
+        if (fromLs && fromLs !== '0000') {
+          cloudApi.putAdminPassword(sid, fromLs).catch((e) => console.warn('교사 비밀번호를 서버에 맞춤 저장하지 못했습니다.', e));
+        }
       }
+      if (window.location.search.includes('session=')) {
+        const u = new URL(window.location.href);
+        u.searchParams.delete('session');
+        window.history.replaceState(null, '', u.pathname + u.search + window.location.hash);
+      }
+      stripRosterFromAddressBar();
+      setCloudRosterHydrated(true);
+    } catch (e) {
+      setCloudRosterHydrated(false);
+      throw e;
     }
-    if (window.location.search.includes('session=')) {
-      const u = new URL(window.location.href);
-      u.searchParams.delete('session');
-      window.history.replaceState(null, '', u.pathname + u.search + window.location.hash);
-    }
-    stripRosterFromAddressBar();
   }, []);
 
   const connectToSession = useCallback(
@@ -235,15 +253,15 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
     })();
   }, [loadFromCloud, initialSessionId]);
 
-  /** 클라우드 세션일 때 명단을 서버에 반영 */
+  /** 클라우드 세션일 때 명단을 서버에 반영 (fetchRoster 이후에만 — 초기 빈 state로 DB를 지우는 것 방지) */
   useEffect(() => {
-    if (!isCloudEnabled() || !sessionId) return;
+    if (!isCloudEnabled() || !sessionId || !cloudRosterHydrated) return;
     if (rosterSyncTimer.current) clearTimeout(rosterSyncTimer.current);
     rosterSyncTimer.current = setTimeout(() => {
       cloudApi.putRoster(sessionId, students).catch((e) => console.error('roster sync', e));
     }, 700);
     return () => clearTimeout(rosterSyncTimer.current);
-  }, [students, sessionId]);
+  }, [students, sessionId, cloudRosterHydrated]);
 
   /** 교사 화면·진행 중 설문일 때 응답 주기적 갱신 */
   useEffect(() => {
