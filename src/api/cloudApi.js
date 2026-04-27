@@ -192,7 +192,18 @@ export async function fetchRoster(sessionId) {
     const sb = getSb();
     const { data, error } = await sb.from('rosters').select('students').eq('session_id', sessionId).maybeSingle();
     if (error) throw new Error(error.message);
-    if (!data) return [];
+    if (!data) {
+      if (import.meta.env.DEV) {
+        const { data: { session } } = await sb.auth.getSession();
+        if (session?.user) {
+          console.warn(
+            '[sociogram] fetchRoster: no row for this session. If rosters has data in SQL but empty here, check RLS: authenticated must read rosters (migration 007).',
+            { sessionId }
+          );
+        }
+      }
+      return [];
+    }
     const students = data.students;
     return Array.isArray(students) ? students : [];
   }
