@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Users, FileText, Lock, ArrowLeft, ShieldCheck, QrCode, Trash2, Link2, Copy } from 'lucide-react';
+import { Users, FileText, Lock, ArrowLeft, ShieldCheck, QrCode, Trash2, Link2, School } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import StudentManager from './components/StudentManager';
 import SociogramNetwork from './components/SociogramNetwork';
@@ -8,12 +8,12 @@ import SurveyForm from './components/SurveyForm';
 import {
   decodeRosterFromLocation,
   buildStudentAccessUrl,
-  buildTeacherClassUrl,
   parseSessionIdFromInput,
   stripRosterFromAddressBar,
 } from './utils/rosterUrl';
 import { isCloudEnabled, isSupabaseTeacherPortalEnabled } from './config.js';
 import { Link } from 'react-router-dom';
+import { useAuth } from './context/AuthContext.jsx';
 import * as cloudApi from './api/cloudApi.js';
 
 const LS_SESSION = 'sociogram_cloud_session_id';
@@ -25,6 +25,7 @@ const LS_SESSION = 'sociogram_cloud_session_id';
  * @param {string | null} [props.classroomLabel] - 대시보드에 학교/학년/반 표시
  */
 export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, classroomLabel = null }) {
+  const { user } = useAuth();
   const [view, setView] = useState('home'); // 'home' | 'teacher' | 'survey'
   const [showQR, setShowQR] = useState(false);
   const [adminPassword, setAdminPassword] = useState(() => {
@@ -82,6 +83,32 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
   const [connectInput, setConnectInput] = useState('');
   const [connectError, setConnectError] = useState('');
   const [connectBusy, setConnectBusy] = useState(false);
+  const [homeClassLabel, setHomeClassLabel] = useState(null);
+
+  /** 홈: 로그인한 교사 + session에 연결된 classrooms 행이 있을 때만 학교·학년·반 표시 */
+  useEffect(() => {
+    if (!isSupabaseTeacherPortalEnabled() || !isCloudEnabled() || !sessionId || !user?.id) {
+      setHomeClassLabel(null);
+      return;
+    }
+    let cancelled = false;
+    cloudApi
+      .getClassroomBySessionId(sessionId)
+      .then((row) => {
+        if (cancelled) return;
+        if (row && row.owner_id === user.id) {
+          setHomeClassLabel(`${row.school_name} ${row.grade}학년 ${row.class_name}`);
+        } else {
+          setHomeClassLabel(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setHomeClassLabel(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, user?.id]);
 
   const loadFromCloud = useCallback(async (sid) => {
     const [st, resp, remotePw] = await Promise.all([
@@ -548,19 +575,8 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
   if (view === 'home') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--background)', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-        {isCloudEnabled() && sessionId ? (
-          <button
-            type="button"
-            onClick={async () => {
-              try {
-                await navigator.clipboard.writeText(buildTeacherClassUrl(sessionId));
-                alert(
-                  '이 브라우저·다른 PC에서 쓸 클래스 주소를 복사했습니다. 같은 주소로 열면 Supabase에 저장된 동일한 데이터가 보입니다.'
-                );
-              } catch {
-                alert('복사에 실패했습니다. 브라우저에서 클립보드 권한을 확인해 주세요.');
-              }
-            }}
+        {isCloudEnabled() && sessionId && homeClassLabel ? (
+          <div
             style={{
               position: 'absolute',
               top: '2rem',
@@ -571,16 +587,18 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
               background: 'white',
               padding: '0.75rem 1.25rem',
               borderRadius: '12px',
-              cursor: 'pointer',
               border: '1px solid var(--border)',
               boxShadow: 'var(--shadow-md)',
               color: 'var(--text-main)',
-              fontWeight: 'bold',
+              fontWeight: 600,
+              maxWidth: 'min(80vw, 22rem)',
             }}
+            role="status"
+            aria-label="현재 학급"
           >
-            <Copy size={20} color="var(--primary)" />
-            다른 PC용 주소 복사
-          </button>
+            <School size={20} color="var(--primary)" style={{ flexShrink: 0 }} />
+            <span style={{ lineHeight: 1.35, fontSize: '0.95rem' }}>{homeClassLabel}</span>
+          </div>
         ) : null}
         <button 
           onClick={() => setShowQR(true)}
