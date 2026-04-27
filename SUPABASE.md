@@ -112,6 +112,7 @@ npm run gh:secrets
 1. [`005_classrooms.sql`](supabase/migrations/005_classrooms.sql) — `classrooms` 테이블·RLS, RPC `create_classroom_for_teacher(text, int, text)`.
 2. [`006_create_classroom_jsonb_rpc.sql`](supabase/migrations/006_create_classroom_jsonb_rpc.sql) — 앱이 사용하는 **`create_classroom(jsonb)`** (한 덩어리 인자). PostgREST가 다인자 RPC를 못 찾는 오류가 나면 006이 필요합니다.
 3. [`007_authenticated_session_tables_rls.sql`](supabase/migrations/007_authenticated_session_tables_rls.sql) — `class_sessions` / `rosters` / `survey_responses`(및 `survey_answer_rows`)에 **`authenticated` 역할**용 RLS를 추가합니다. `001_init`은 `anon`만 열어 두어, **Supabase 로그인 세션이 있는 브라우저**에서 `?session=`·QR로 접속하면 명단이 비어 보일 수 있었습니다. 적용 후 검증: **SQL Editor**에서 `select students from public.rosters where session_id = '<세션 UUID>';` — DB에 데이터가 있는데 앱만 비면 아직 이 마이그레이션이 안 된 것입니다.
+4. [`008_delete_classroom_for_session.sql`](supabase/migrations/008_delete_classroom_for_session.sql) — `delete_classroom_for_session(uuid)` RPC(본인 `classrooms`만). **내 학급** 화면에서 학급 삭제 시 `class_sessions`를 지우고 CASCADE로 명단·설문이 함께 정리됩니다.
 
 - **`classrooms`**: `owner_id` → `auth.users`, `school_name`, `grade`(1–12), `class_name`, `session_id` → `class_sessions.id`(1:1, UNIQUE). **RLS**: 로그인한 본인(`auth.uid()`)의 행만 읽기/쓰기.
 - **RPC `create_classroom(jsonb)`**: `p_payload`에 `school_name`, `grade`, `class_name`. 응답 JSON에 `session_id`, `classroom_id`.

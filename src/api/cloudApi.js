@@ -405,3 +405,16 @@ export async function getClassroomBySessionId(sessionId) {
   if (error) throw new Error(error.message);
   return data;
 }
+
+/**
+ * 본인 소유 학급 삭제 (세션·명단·설문 등 CASCADE). Supabase `008_delete_classroom_for_session.sql` 필요
+ * @param {string} sessionId class_sessions.id
+ */
+export async function deleteClassroomBySessionId(sessionId) {
+  if (!shouldUseSupabase()) {
+    throw new Error('VITE_SUPABASE만 사용하는 모드에서 지원됩니다.');
+  }
+  const sb = getSb();
+  const { error } = await sb.rpc('delete_classroom_for_session', { p_session_id: sessionId });
+  if (error) throw new Error(error.message);
+}

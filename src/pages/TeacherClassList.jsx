@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { School, LogOut, Plus } from 'lucide-react';
+import { School, LogOut, Plus, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import * as cloudApi from '../api/cloudApi.js';
 
@@ -14,6 +14,7 @@ export default function TeacherClassList() {
   const [schoolName, setSchoolName] = useState('');
   const [grade, setGrade] = useState(3);
   const [className, setClassName] = useState('');
+  const [deletingId, setDeletingId] = useState(null);
 
   const load = () => {
     setLoading(true);
@@ -47,6 +48,27 @@ export default function TeacherClassList() {
       setError(err.message || '학급을 만들지 못했습니다.');
     } finally {
       setAdding(false);
+    }
+  };
+
+  const handleDelete = async (r) => {
+    const label = `${r.school_name} ${r.grade}학년 ${r.class_name}`;
+    if (!window.confirm(`「${label}」학급을 삭제할까요?\n명단·설문 기록이 모두 지워지며 복구할 수 없습니다.`)) {
+      return;
+    }
+    setDeletingId(r.id);
+    setError('');
+    try {
+      await cloudApi.deleteClassroomBySessionId(r.session_id);
+      if (localStorage.getItem('sociogram_cloud_session_id') === r.session_id) {
+        localStorage.removeItem('sociogram_cloud_session_id');
+        localStorage.removeItem(`sociogram_roster_session_${r.session_id}`);
+      }
+      load();
+    } catch (err) {
+      setError(err.message || '삭제하지 못했습니다. DB에 008_delete_classroom_for_session.sql 이 적용됐는지 확인하세요.');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -117,11 +139,20 @@ export default function TeacherClassList() {
         ) : (
           <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             {rows.map((r) => (
-              <li key={r.id}>
+              <li
+                key={r.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'stretch',
+                  gap: '0.5rem',
+                }}
+              >
                 <Link
                   to={`/teacher/session/${encodeURIComponent(r.session_id)}`}
                   style={{
                     display: 'flex',
+                    flex: 1,
+                    minWidth: 0,
                     alignItems: 'center',
                     gap: '0.75rem',
                     padding: '1rem',
@@ -133,7 +164,7 @@ export default function TeacherClassList() {
                     boxShadow: 'var(--shadow-sm)',
                   }}
                 >
-                  <School size={22} color="var(--primary)" />
+                  <School size={22} color="var(--primary)" style={{ flexShrink: 0 }} />
                   <div>
                     <div style={{ fontWeight: 700 }}>{r.school_name}</div>
                     <div style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
@@ -141,6 +172,27 @@ export default function TeacherClassList() {
                     </div>
                   </div>
                 </Link>
+                <button
+                  type="button"
+                  className="btn"
+                  title="이 학급 삭제"
+                  disabled={deletingId === r.id}
+                  onClick={() => void handleDelete(r)}
+                  style={{
+                    flexShrink: 0,
+                    padding: '0 0.9rem',
+                    color: 'var(--danger)',
+                    border: '1px solid var(--border)',
+                    background: 'white',
+                    borderRadius: '12px',
+                    cursor: deletingId === r.id ? 'wait' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Trash2 size={18} />
+                </button>
               </li>
             ))}
           </ul>
