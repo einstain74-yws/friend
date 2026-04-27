@@ -81,6 +81,17 @@ function shouldUseSupabase() {
   return isSupabaseEnabled() && !shouldUseLocalApi() && !isFirestoreEnabled();
 }
 
+/**
+ * 과거 설문 스냅샷(survey_history_items)은 Supabase 전용.
+ * VITE_DATA_BACKEND=auto + Firestore가 켜져 있어도, Supabase URL/키가 있으면
+ * 명단/응답은 Firestore를 쓰면서 이 테이블만 Supabase에 동기화할 수 있음(009 마이그레이션).
+ * 단, session_id는 Supabase `class_sessions`에 있어야 FK가 성립(교사 포털로 만든 반 기준).
+ */
+function shouldUseSupabaseForSurveyHistory() {
+  if (shouldUseLocalApi()) return false;
+  return isSupabaseEnabled();
+}
+
 export async function createSession() {
   if (shouldUseLocalApi()) {
     return fetchJson(apiUrl('/api/sessions'), {
@@ -428,10 +439,10 @@ export async function deleteClassroomBySessionId(sessionId) {
  * @returns {Promise<SurveyHistoryItem[]>}
  */
 export async function fetchSurveyHistoryItems(sessionId) {
-  if (shouldUseLocalApi() || shouldUseFirestore()) {
+  if (shouldUseLocalApi()) {
     return [];
   }
-  if (!shouldUseSupabase()) {
+  if (!shouldUseSupabaseForSurveyHistory()) {
     return [];
   }
   const sb = getSb();
@@ -454,10 +465,10 @@ export async function fetchSurveyHistoryItems(sessionId) {
  * @param {SurveyHistoryItem} item
  */
 export async function upsertSurveyHistoryItem(sessionId, item) {
-  if (shouldUseLocalApi() || shouldUseFirestore()) {
+  if (shouldUseLocalApi()) {
     return;
   }
-  if (!shouldUseSupabase()) {
+  if (!shouldUseSupabaseForSurveyHistory()) {
     return;
   }
   const sb = getSb();
@@ -479,10 +490,10 @@ export async function upsertSurveyHistoryItem(sessionId, item) {
  * @param {string} clientId
  */
 export async function deleteSurveyHistoryItem(sessionId, clientId) {
-  if (shouldUseLocalApi() || shouldUseFirestore()) {
+  if (shouldUseLocalApi()) {
     return;
   }
-  if (!shouldUseSupabase()) {
+  if (!shouldUseSupabaseForSurveyHistory()) {
     return;
   }
   const sb = getSb();

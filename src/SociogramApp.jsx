@@ -158,7 +158,10 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
           console.error(err);
           return null;
         }),
-        cloudApi.fetchSurveyHistoryItems(sid).catch(() => []),
+        cloudApi.fetchSurveyHistoryItems(sid).catch((err) => {
+          console.error('과거 설문 기록(서버)을 불러오지 못했습니다.', err);
+          return [];
+        }),
       ]);
       let roster = Array.isArray(st) ? st : [];
       if (roster.length === 0) {
@@ -205,7 +208,10 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
                   await cloudApi.upsertSurveyHistoryItem(sid, h);
                 }
               }
-              const after = await cloudApi.fetchSurveyHistoryItems(sid).catch(() => []);
+              const after = await cloudApi.fetchSurveyHistoryItems(sid).catch((err) => {
+                console.error('과거 설문 기록(마이그레이션 후 조회) 실패', err);
+                return [];
+              });
               nextHistory = after.length > 0 ? after : local;
             }
           }
@@ -495,33 +501,36 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
     return rels;
   }, [activeResponses]);
 
-  const handleCloseSurvey = () => {
+  const handleCloseSurvey = async () => {
     const today = new Date();
     const defaultTitle = `${today.getMonth() + 1}월 ${today.getDate()}일 설문 마감`;
     const title = prompt('마감할 설문의 제목(또는 마감일)을 입력하세요.', defaultTitle);
 
-    if (title) {
-      const newHistory = {
-        id: Date.now().toString(),
-        title: title,
-        responses: [...responses],
-        students: [...students],
-      };
-      setSurveyHistory([...surveyHistory, newHistory]);
-      setResponses([]);
-      if (isCloudEnabled() && sessionId) {
-        void (async () => {
-          try {
-            await cloudApi.upsertSurveyHistoryItem(sessionId, newHistory);
-            await cloudApi.putResponses(sessionId, []);
-          } catch (e) {
-            console.error('close survey sync', e);
-            alert('클라우드에 마감 기록을 모두 저장하지 못했습니다. 네트워크와 Supabase(009_survey_history_items)를 확인하세요.');
-          }
-        })();
+    if (!title) return;
+
+    const newHistory = {
+      id: Date.now().toString(),
+      title: title,
+      responses: [...responses],
+      students: [...students],
+    };
+
+    if (isCloudEnabled() && sessionId) {
+      try {
+        await cloudApi.upsertSurveyHistoryItem(sessionId, newHistory);
+        await cloudApi.putResponses(sessionId, []);
+      } catch (e) {
+        console.error('close survey sync', e);
+        alert(
+          '클라우드에 마감 기록을 모두 저장하지 못했습니다. 네트워크·Supabase(009_survey_history_items)·반이 Supabase에 생성됐는지(Firestore 전용 반은 기록 저장이 제한될 수 있음)를 확인하세요.'
+        );
+        return;
       }
-      alert('설문이 마감되고 결과가 저장되었습니다. 과거 기록에서 열람할 수 있습니다.');
     }
+
+    setSurveyHistory((prev) => [...prev, newHistory]);
+    setResponses([]);
+    alert('설문이 마감되고 결과가 저장되었습니다. 과거 기록에서 열람할 수 있습니다.');
   };
 
   const handleRemoveHistory = (e, idToDelete) => {
