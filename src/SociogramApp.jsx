@@ -151,13 +151,14 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
   const loadFromCloud = useCallback(async (sid) => {
     setCloudRosterHydrated(false);
     try {
-      const [st, resp, remotePw] = await Promise.all([
+      const [st, resp, remotePw, histFromServer] = await Promise.all([
         cloudApi.fetchRoster(sid),
         cloudApi.fetchResponses(sid),
         cloudApi.fetchAdminPassword(sid).catch((err) => {
           console.error(err);
           return null;
         }),
+        cloudApi.fetchSurveyHistoryItems(sid).catch(() => []),
       ]);
       let roster = Array.isArray(st) ? st : [];
       if (roster.length === 0) {
@@ -193,6 +194,26 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
       }
       setStudents(roster);
       setResponses(resp);
+      let nextHistory = Array.isArray(histFromServer) ? histFromServer : [];
+      if (nextHistory.length === 0) {
+        try {
+          if (localStorage.getItem(LS_SESSION) === sid) {
+            const local = JSON.parse(localStorage.getItem('sociogram_history') || '[]');
+            if (Array.isArray(local) && local.length > 0) {
+              for (const h of local) {
+                if (h?.id && h?.title) {
+                  await cloudApi.upsertSurveyHistoryItem(sid, h);
+                }
+              }
+              const after = await cloudApi.fetchSurveyHistoryItems(sid).catch(() => []);
+              nextHistory = after.length > 0 ? after : local;
+            }
+          }
+        } catch (e) {
+          console.warn('survey history migrate', e);
+        }
+      }
+      setSurveyHistory(nextHistory);
       const fromLs = localStorage.getItem('sociogram_admin_pw') || '0000';
       if (remotePw != null && String(remotePw).length > 0) {
         setAdminPassword(String(remotePw));
@@ -489,7 +510,15 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
       setSurveyHistory([...surveyHistory, newHistory]);
       setResponses([]);
       if (isCloudEnabled() && sessionId) {
-        cloudApi.putResponses(sessionId, []).catch((e) => console.error('close survey sync', e));
+        void (async () => {
+          try {
+            await cloudApi.upsertSurveyHistoryItem(sessionId, newHistory);
+            await cloudApi.putResponses(sessionId, []);
+          } catch (e) {
+            console.error('close survey sync', e);
+            alert('클라우드에 마감 기록을 모두 저장하지 못했습니다. 네트워크와 Supabase(009_survey_history_items)를 확인하세요.');
+          }
+        })();
       }
       alert('설문이 마감되고 결과가 저장되었습니다. 과거 기록에서 열람할 수 있습니다.');
     }
@@ -501,7 +530,12 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
       if (activeHistoryId === idToDelete) {
         setActiveHistoryId('current');
       }
-      setSurveyHistory(surveyHistory.filter(h => h.id !== idToDelete));
+      setSurveyHistory(surveyHistory.filter((h) => h.id !== idToDelete));
+      if (isCloudEnabled() && sessionId) {
+        cloudApi.deleteSurveyHistoryItem(sessionId, idToDelete).catch((err) => {
+          console.error('delete history sync', err);
+        });
+      }
     }
   };
 
@@ -849,8 +883,10 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
         <h1>
           <Users size={28} />
           <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.15rem' }}>
-            {classroomLabel ? (
-              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>{classroomLabel}</span>
+            {classroomLabel || homeClassLabel ? (
+              <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                {classroomLabel || homeClassLabel}
+              </span>
             ) : null}
             <span>
               {activeHistoryId === 'current'

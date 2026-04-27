@@ -418,3 +418,78 @@ export async function deleteClassroomBySessionId(sessionId) {
   const { error } = await sb.rpc('delete_classroom_for_session', { p_session_id: sessionId });
   if (error) throw new Error(error.message);
 }
+
+/**
+ * @typedef {{ id: string, title: string, students: unknown[], responses: unknown[] }} SurveyHistoryItem
+ */
+
+/**
+ * @param {string} sessionId
+ * @returns {Promise<SurveyHistoryItem[]>}
+ */
+export async function fetchSurveyHistoryItems(sessionId) {
+  if (shouldUseLocalApi() || shouldUseFirestore()) {
+    return [];
+  }
+  if (!shouldUseSupabase()) {
+    return [];
+  }
+  const sb = getSb();
+  const { data, error } = await sb
+    .from('survey_history_items')
+    .select('client_id, title, students, responses, created_at')
+    .eq('session_id', sessionId)
+    .order('created_at', { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data || []).map((row) => ({
+    id: row.client_id,
+    title: row.title,
+    students: row.students,
+    responses: row.responses,
+  }));
+}
+
+/**
+ * @param {string} sessionId
+ * @param {SurveyHistoryItem} item
+ */
+export async function upsertSurveyHistoryItem(sessionId, item) {
+  if (shouldUseLocalApi() || shouldUseFirestore()) {
+    return;
+  }
+  if (!shouldUseSupabase()) {
+    return;
+  }
+  const sb = getSb();
+  const { error } = await sb.from('survey_history_items').upsert(
+    {
+      session_id: sessionId,
+      client_id: String(item.id),
+      title: String(item.title ?? ''),
+      students: item.students ?? [],
+      responses: item.responses ?? [],
+    },
+    { onConflict: 'session_id,client_id' }
+  );
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * @param {string} sessionId
+ * @param {string} clientId
+ */
+export async function deleteSurveyHistoryItem(sessionId, clientId) {
+  if (shouldUseLocalApi() || shouldUseFirestore()) {
+    return;
+  }
+  if (!shouldUseSupabase()) {
+    return;
+  }
+  const sb = getSb();
+  const { error } = await sb
+    .from('survey_history_items')
+    .delete()
+    .eq('session_id', sessionId)
+    .eq('client_id', String(clientId));
+  if (error) throw new Error(error.message);
+}
