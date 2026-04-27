@@ -826,8 +826,6 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
                   <Link to="/auth/login" style={{ color: 'var(--primary)', fontWeight: 600 }}>교사 로그인</Link>
                   <span style={{ color: 'var(--text-muted)' }}>·</span>
                   <Link to="/auth/register" style={{ color: 'var(--primary)', fontWeight: 600 }}>교사 회원가입(학급)</Link>
-                  <span style={{ color: 'var(--text-muted)' }}>·</span>
-                  <Link to="/teacher" style={{ color: 'var(--primary)', fontWeight: 600 }}>내 학급 목록</Link>
                 </>
               )}
             </div>

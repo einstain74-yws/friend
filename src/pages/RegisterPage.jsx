@@ -73,7 +73,7 @@ export default function RegisterPage() {
       >
         <h1 style={{ fontSize: '1.25rem', margin: '0 0 0.5rem 0' }}>교사 회원가입</h1>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-          계정을 만든 뒤 첫 학급(학교·학년·반)이 함께 등록됩니다. 이후 &quot;내 학급 목록&quot;에서 관리합니다.
+          계정을 만든 뒤 첫 학급(학교·학년·반)이 함께 등록됩니다. 이후 로그인한 뒤 학급을 관리합니다.
         </p>
         <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
           <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>이메일</label>
