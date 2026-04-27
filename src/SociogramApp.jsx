@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Users, FileText, Lock, ArrowLeft, ShieldCheck, QrCode, Trash2, Link2, School, Home, LogOut } from 'lucide-react';
+import { Users, FileText, Lock, ArrowLeft, ShieldCheck, QrCode, Trash2, School, Home, LogOut } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import StudentManager from './components/StudentManager';
 import SociogramNetwork from './components/SociogramNetwork';
@@ -262,6 +262,22 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
     }, 700);
     return () => clearTimeout(rosterSyncTimer.current);
   }, [students, sessionId, cloudRosterHydrated]);
+
+  /** 홈: 학생용 QR 모달 — 로컬에 명단이 비어 있어도 클라우드면 서버에 저장된 명단을 한 번 더 불러옴 */
+  useEffect(() => {
+    if (!showQR || !isCloudEnabled() || !sessionId || !cloudRosterHydrated) return;
+    let cancelled = false;
+    cloudApi
+      .fetchRoster(sessionId)
+      .then((st) => {
+        if (cancelled || !Array.isArray(st) || st.length === 0) return;
+        setStudents((prev) => (prev.length > 0 ? prev : st));
+      })
+      .catch((e) => console.error('QR modal roster', e));
+    return () => {
+      cancelled = true;
+    };
+  }, [showQR, sessionId, cloudRosterHydrated]);
 
   /** 교사 화면·진행 중 설문일 때 응답 주기적 갱신 */
   useEffect(() => {
@@ -631,13 +647,19 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
           <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }} onClick={() => setShowQR(false)}>
             <div style={{ background: 'white', padding: '2rem 2.25rem', borderRadius: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: 'var(--shadow-xl)', gap: '1rem', textAlign: 'center', maxWidth: '360px' }} onClick={e => e.stopPropagation()}>
               <h2 style={{ margin: 0, color: 'var(--text-main)', fontSize: '1.25rem' }}>학생 접속용 QR</h2>
-              {students.length === 0 ? (
+              {students.length === 0 && !(isCloudEnabled() && sessionId) ? (
                 <p style={{ margin: 0, color: 'var(--danger)', fontSize: '0.9rem', lineHeight: 1.5 }}>
                   먼저 <strong>교사용</strong>에서 명단을 등록한 뒤, 이 화면을 다시 여 주세요.
                 </p>
               ) : (
                 <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.85rem', lineHeight: 1.4 }}>
-                  스마트폰 카메라로 QR을 스캔하면 설문으로 이동합니다.
+                  {isCloudEnabled() && sessionId ? (
+                    <>
+                      QR에는 학급 주소(세션)만 담깁니다. 교사용에서 바꾼 명단은 서버에 저장되며, 학생이 이 QR로 들어가면 항상 그때의 명단이 표시됩니다.
+                    </>
+                  ) : (
+                    '스마트폰 카메라로 QR을 스캔하면 설문으로 이동합니다.'
+                  )}
                 </p>
               )}
               <div style={{ padding: '1rem', background: 'white', borderRadius: '16px', border: '1px solid var(--border)', lineHeight: 0 }}>
@@ -648,39 +670,14 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
                   includeMargin
                 />
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%' }}>
-                <button
-                  type="button"
-                  className="btn"
-                  style={{ width: '100%', padding: '0.65rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', border: '1px solid var(--border)', background: 'var(--background)' }}
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(
-                        buildStudentAccessUrl(students, isCloudEnabled() && sessionId ? sessionId : null)
-                      );
-                      alert(
-                        students.length
-                          ? isCloudEnabled() && sessionId
-                            ? '클라우드 링크를 복사했습니다. 학생 제출이 서버에 모입니다.'
-                            : '명단이 포함된 주소를 복사했습니다.'
-                          : '주소를 복사했습니다. 교사용에서 명단을 넣은 뒤 다시 복사하세요.'
-                      );
-                    } catch {
-                      alert('복사에 실패했습니다. 브라우저 설정에서 클립보드 권한을 확인해 주세요.');
-                    }
-                  }}
-                >
-                  <Link2 size={16} />
-                  명단 포함 링크 복사
-                </button>
-                <button
-                  onClick={() => setShowQR(false)}
-                  className="btn btn-primary"
-                  style={{ width: '100%', padding: '0.75rem' }}
-                >
-                  닫기
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowQR(false)}
+                className="btn btn-primary"
+                style={{ width: '100%', padding: '0.75rem' }}
+              >
+                닫기
+              </button>
             </div>
           </div>
         )}
