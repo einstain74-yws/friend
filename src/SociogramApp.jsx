@@ -17,6 +17,16 @@ import { useAuth } from './context/AuthContext.jsx';
 import * as cloudApi from './api/cloudApi.js';
 
 const LS_SESSION = 'sociogram_cloud_session_id';
+/** 같은 class session용 로컬 명단 — 서버가 빈 []일 때(저장 실패·로그아웃 직전 등)에만 loadFromCloud에서 복구 */
+const LS_ROSTER_BY_SESSION = 'sociogram_roster_session_';
+
+function isValidRosterList(arr) {
+  return (
+    Array.isArray(arr) &&
+    arr.length > 0 &&
+    arr.every((s) => s && typeof s.id === 'string' && typeof s.name === 'string')
+  );
+}
 
 /**
  * @param {object} props
@@ -133,7 +143,36 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
           return null;
         }),
       ]);
-      setStudents(st);
+      let roster = Array.isArray(st) ? st : [];
+      if (roster.length === 0) {
+        const fromCache = () => {
+          try {
+            const raw = localStorage.getItem(`${LS_ROSTER_BY_SESSION}${sid}`);
+            const c = raw ? JSON.parse(raw) : [];
+            if (isValidRosterList(c)) return c;
+          } catch {
+            /* ignore */
+          }
+          if (localStorage.getItem(LS_SESSION) === sid) {
+            try {
+              const raw2 = localStorage.getItem('sociogram_students');
+              const c2 = raw2 ? JSON.parse(raw2) : [];
+              if (isValidRosterList(c2)) return c2;
+            } catch {
+              /* ignore */
+            }
+          }
+          return null;
+        };
+        const recovered = fromCache();
+        if (recovered) {
+          roster = recovered;
+          cloudApi.putRoster(sid, roster).catch((e) =>
+            console.warn('로컬 캐시 명단을 서버에 맞춤 저장하지 못했습니다.', e)
+          );
+        }
+      }
+      setStudents(roster);
       setResponses(resp);
       const fromLs = localStorage.getItem('sociogram_admin_pw') || '0000';
       if (remotePw != null && String(remotePw).length > 0) {
@@ -205,8 +244,12 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
   }, [loadFromCloud]);
 
   useEffect(() => {
-    localStorage.setItem('sociogram_students', JSON.stringify(students));
-  }, [students]);
+    const json = JSON.stringify(students);
+    localStorage.setItem('sociogram_students', json);
+    if (sessionId) {
+      localStorage.setItem(`${LS_ROSTER_BY_SESSION}${sessionId}`, json);
+    }
+  }, [students, sessionId]);
 
   useEffect(() => {
     localStorage.setItem('sociogram_responses', JSON.stringify(responses));
