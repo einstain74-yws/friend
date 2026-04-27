@@ -25,8 +25,11 @@
    **A. SQL Editor (브라우저)**  
    **SQL Editor** → 새 쿼리 → [`supabase/migrations/001_init.sql`](supabase/migrations/001_init.sql) 파일 내용 **전체 복사** → **Run**.
 
-   **B. 터미널 (이 PC에서 한 번에)** — Supabase에 직접 로그인할 수 없을 때 편합니다.  
-   대시보드 **Project Settings → Database → Connection string → URI** 를 복사하고, `[YOUR-PASSWORD]` 를 프로젝트 DB 비밀번호로 바꿉니다. 그다음 프로젝트 루트에서:
+   **B. 터미널 (이 PC에서 한 번에)** — Supabase에 직접 로그인할 수 없을 때 편합니다.
+
+   **Connection string (URI)은 어디?** — **Database → Tables** 화면에는 없습니다. 왼쪽 맨 아래 **⚙ Project settings**(또는 톱니바퀴)를 누른 뒤 **Configuration → Database**로 가거나, 상단에서 프로젝트 선택 후 **Project Settings**로 들어갑니다. **Database** 섹션에서 **Connection string**을 펼치고 표시 형식을 **URI**로 바꾼 다음 복사합니다. `[YOUR-PASSWORD]` 자리에 **DB 비밀번호**(프로젝트 생성 시 설정한 값, 잊었으면 같은 Database 화면에서 비밀번호 재설정)를 넣습니다.
+
+   URI를 복사한 뒤 `[YOUR-PASSWORD]` 를 프로젝트 DB 비밀번호로 바꿉니다. 그다음 프로젝트 루트에서:
 
    `.env.local` 에 한 줄 추가(비밀번호는 대시보드 URI 그대로):
 
