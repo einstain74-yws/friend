@@ -1,7 +1,7 @@
 # 학급 교우 관계 분석기 (React + Vite)
 
-**GitHub Pages** 배포는 `VITE_DATA_BACKEND=auto` 로 빌드됩니다. **Firebase·Supabase 시크릿을 모두 넣으면 Firestore에 먼저** 저장됩니다. ([FIRESTORE.md](FIRESTORE.md))  
-로컬에서 **Supabase만** 쓰려면 `.env.local`에 `VITE_DATA_BACKEND=supabase` ([SUPABASE.md](SUPABASE.md)).
+**GitHub Pages** 배포(`.github/workflows/deploy-gh-pages.yml`)는 **`VITE_DATA_BACKEND=supabase`**와 Repository **Secrets**의 `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`로 빌드합니다. **Firestore를 쓰는 다른 배포**는 [FIRESTORE.md](FIRESTORE.md)를 참고하세요.  
+로컬은 `.env.local`에 동일한 `VITE_DATA_BACKEND=supabase`와 Supabase 키를 맞추면 노트북과 웹·DB가 갈리지 않습니다. ([SUPABASE.md](SUPABASE.md))
 
 ---
 

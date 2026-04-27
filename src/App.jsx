@@ -1,11 +1,17 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Users, FileText, Lock, ArrowLeft, ShieldCheck, QrCode, Trash2, Link2 } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { Users, FileText, Lock, ArrowLeft, ShieldCheck, QrCode, Trash2, Link2, Copy } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import StudentManager from './components/StudentManager';
 import SociogramNetwork from './components/SociogramNetwork';
 import InsightsDashboard from './components/InsightsDashboard';
 import SurveyForm from './components/SurveyForm';
-import { decodeRosterFromLocation, buildStudentAccessUrl, stripRosterFromAddressBar } from './utils/rosterUrl';
+import {
+  decodeRosterFromLocation,
+  buildStudentAccessUrl,
+  buildTeacherClassUrl,
+  parseSessionIdFromInput,
+  stripRosterFromAddressBar,
+} from './utils/rosterUrl';
 import { isCloudEnabled } from './config.js';
 import * as cloudApi from './api/cloudApi.js';
 
@@ -64,6 +70,85 @@ function App() {
 
   const rosterSyncTimer = useRef(null);
 
+  const [connectInput, setConnectInput] = useState('');
+  const [connectError, setConnectError] = useState('');
+  const [connectBusy, setConnectBusy] = useState(false);
+
+  const loadFromCloud = useCallback(async (sid) => {
+    const [st, resp, remotePw] = await Promise.all([
+      cloudApi.fetchRoster(sid),
+      cloudApi.fetchResponses(sid),
+      cloudApi.fetchAdminPassword(sid).catch((err) => {
+        console.error(err);
+        return null;
+      }),
+    ]);
+    setStudents(st);
+    setResponses(resp);
+    const fromLs = localStorage.getItem('sociogram_admin_pw') || '0000';
+    if (remotePw != null && String(remotePw).length > 0) {
+      setAdminPassword(String(remotePw));
+      localStorage.setItem('sociogram_admin_pw', String(remotePw));
+    } else {
+      setAdminPassword(fromLs);
+      if (fromLs && fromLs !== '0000') {
+        cloudApi.putAdminPassword(sid, fromLs).catch((e) => console.warn('교사 비밀번호를 서버에 맞춤 저장하지 못했습니다.', e));
+      }
+    }
+    if (window.location.search.includes('session=')) {
+      const u = new URL(window.location.href);
+      u.searchParams.delete('session');
+      window.history.replaceState(null, '', u.pathname + u.search + window.location.hash);
+    }
+    stripRosterFromAddressBar();
+  }, []);
+
+  const connectToSession = useCallback(
+    async (id, onFailReset) => {
+      setConnectError('');
+      setConnectBusy(true);
+      setCloudReady(false);
+      try {
+        localStorage.setItem(LS_SESSION, id);
+        setSessionId(id);
+        await loadFromCloud(id);
+      } catch (e) {
+        console.error(e);
+        if (onFailReset) {
+          setSessionId(null);
+          localStorage.removeItem(LS_SESSION);
+        }
+        alert(
+          '클라우드에서 데이터를 불러오지 못했습니다. VITE_FIREBASE_* (Firestore) 또는 VITE_SUPABASE_* 와 Supabase SQL 마이그레이션을 확인하세요.'
+        );
+      } finally {
+        setConnectBusy(false);
+        setCloudReady(true);
+      }
+    },
+    [loadFromCloud]
+  );
+
+  const createNewClass = useCallback(async () => {
+    setConnectError('');
+    setConnectBusy(true);
+    setCloudReady(false);
+    try {
+      const { id } = await cloudApi.createSession();
+      localStorage.setItem(LS_SESSION, id);
+      setSessionId(id);
+      await loadFromCloud(id);
+    } catch (e) {
+      console.error(e);
+      localStorage.removeItem(LS_SESSION);
+      setSessionId(null);
+      alert('새 클래스를 만들지 못했습니다. 네트워크와 Supabase 설정을 확인해 주세요.');
+    } finally {
+      setConnectBusy(false);
+      setCloudReady(true);
+    }
+  }, [loadFromCloud]);
+
   useEffect(() => {
     localStorage.setItem('sociogram_students', JSON.stringify(students));
   }, [students]);
@@ -96,28 +181,9 @@ function App() {
     setSessionId(sid);
     localStorage.setItem(LS_SESSION, sid);
     (async () => {
+      setCloudReady(false);
       try {
-        const [st, resp, remotePw] = await Promise.all([
-          cloudApi.fetchRoster(sid),
-          cloudApi.fetchResponses(sid),
-          cloudApi.fetchAdminPassword(sid).catch((err) => {
-            console.error(err);
-            return null;
-          }),
-        ]);
-        setStudents(st);
-        setResponses(resp);
-        // 교사용 비밀번호: 서버(Supabase/Firestore/로컬 API)에 있으면 그걸 쓰고, 없으면 이 기기 localStorage → 기기 간 맞추기 위해 첫 기기의 값을 서버에 올림
-        const fromLs = localStorage.getItem('sociogram_admin_pw') || '0000';
-        if (remotePw != null && String(remotePw).length > 0) {
-          setAdminPassword(String(remotePw));
-          localStorage.setItem('sociogram_admin_pw', String(remotePw));
-        } else {
-          setAdminPassword(fromLs);
-          if (fromLs && fromLs !== '0000') {
-            cloudApi.putAdminPassword(sid, fromLs).catch((e) => console.warn('교사 비밀번호를 서버에 맞춤 저장하지 못했습니다.', e));
-          }
-        }
+        await loadFromCloud(sid);
       } catch (e) {
         console.error(e);
         alert(
@@ -125,15 +191,9 @@ function App() {
         );
       } finally {
         setCloudReady(true);
-        if (window.location.search.includes('session=')) {
-          const u = new URL(window.location.href);
-          u.searchParams.delete('session');
-          window.history.replaceState(null, '', u.pathname + u.search + window.location.hash);
-        }
-        stripRosterFromAddressBar();
       }
     })();
-  }, []);
+  }, [loadFromCloud]);
 
   /** 클라우드 세션일 때 명단을 서버에 반영 */
   useEffect(() => {
@@ -365,10 +425,141 @@ function App() {
     );
   }
 
+  /** 클라우드인데 이 브라우저에 `session`이 없을 때: 새로 만들기 또는 기존 URL·UUID로 연결 */
+  if (isCloudEnabled() && !sessionId) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'var(--background)',
+          padding: '1.5rem',
+        }}
+      >
+        <div
+          style={{
+            maxWidth: '440px',
+            width: '100%',
+            background: 'white',
+            padding: '1.75rem 1.5rem',
+            borderRadius: '20px',
+            boxShadow: 'var(--shadow-lg)',
+            border: '1px solid var(--border)',
+          }}
+        >
+          <h1 style={{ fontSize: '1.25rem', margin: '0 0 0.5rem 0', color: 'var(--text-main)' }}>클라우드 클래스 연결</h1>
+          <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: 1.55, margin: '0 0 1.25rem 0' }}>
+            다른 PC나 브라우저에서도 <strong>같은</strong> 명단·설문을 보려면, 아래에서 기존 주소로 들어오거나 새 클래스를 만든 뒤 &quot;다른 PC용 주소
+            복사&quot;로 즐겨찾기해 두면 됩니다.
+          </p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              setConnectError('');
+              const id = parseSessionIdFromInput(connectInput);
+              if (!id) {
+                setConnectError('?session= 이 있는 페이지 주소를 붙여 넣거나, UUID만 입력해 주세요.');
+                return;
+              }
+              void connectToSession(id, true);
+            }}
+            style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}
+          >
+            <label style={{ fontSize: '0.85rem', color: 'var(--text-main)', fontWeight: 600 }}>기존 클래스 URL 또는 세션 ID</label>
+            <input
+              type="text"
+              value={connectInput}
+              onChange={(e) => {
+                setConnectInput(e.target.value);
+                if (connectError) setConnectError('');
+              }}
+              placeholder="https://...?session=... 또는 xxxxxxxx-xxxx-..."
+              disabled={connectBusy}
+              style={{
+                width: '100%',
+                boxSizing: 'border-box',
+                padding: '0.65rem 0.75rem',
+                borderRadius: '10px',
+                border: '1px solid var(--border)',
+                fontSize: '0.9rem',
+              }}
+            />
+            {connectError ? (
+              <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--danger)' }} role="alert">
+                {connectError}
+              </p>
+            ) : null}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={connectBusy}
+                style={{ width: '100%', padding: '0.7rem' }}
+              >
+                {connectBusy ? '연결 중…' : '이 주소(세션)로 연결'}
+              </button>
+              <button
+                type="button"
+                className="btn"
+                disabled={connectBusy}
+                onClick={() => void createNewClass()}
+                style={{
+                  width: '100%',
+                  padding: '0.7rem',
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                }}
+              >
+                새 클래스 만들기
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   // HOME GATEWAY VIEW
   if (view === 'home') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: 'var(--background)', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+        {isCloudEnabled() && sessionId ? (
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(buildTeacherClassUrl(sessionId));
+                alert(
+                  '이 브라우저·다른 PC에서 쓸 클래스 주소를 복사했습니다. 같은 주소로 열면 Supabase에 저장된 동일한 데이터가 보입니다.'
+                );
+              } catch {
+                alert('복사에 실패했습니다. 브라우저에서 클립보드 권한을 확인해 주세요.');
+              }
+            }}
+            style={{
+              position: 'absolute',
+              top: '2rem',
+              left: '2rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              background: 'white',
+              padding: '0.75rem 1.25rem',
+              borderRadius: '12px',
+              cursor: 'pointer',
+              border: '1px solid var(--border)',
+              boxShadow: 'var(--shadow-md)',
+              color: 'var(--text-main)',
+              fontWeight: 'bold',
+            }}
+          >
+            <Copy size={20} color="var(--primary)" />
+            다른 PC용 주소 복사
+          </button>
+        ) : null}
         <button 
           onClick={() => setShowQR(true)}
           style={{ position: 'absolute', top: '2rem', right: '2rem', display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'white', padding: '0.75rem 1.25rem', borderRadius: '12px', cursor: 'pointer', border: '1px solid var(--border)', boxShadow: 'var(--shadow-md)', color: 'var(--text-main)', fontWeight: 'bold' }}

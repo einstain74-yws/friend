@@ -2,7 +2,7 @@
 
 앱이 **같은 Supabase 프로젝트**만 바라보면, 선생님 PC·학생 폰 등 어디서 접속해도 같은 명단·설문 결과를 볼 수 있습니다.
 
-**Supabase만 DB에 쓰려면** 루트 `.env.local`에 `VITE_DATA_BACKEND=supabase` 를 넣으세요. ([`src/config.js`](src/config.js) — 이 값이면 `VITE_FIREBASE_*`가 있어도 Firestore 데이터 경로는 사용하지 않습니다.) **GitHub Pages** 워크플로는 기본 **`VITE_DATA_BACKEND=auto`** 이며, Firebase 시크릿이 있으면 Firestore가 우선입니다. ([FIRESTORE.md](FIRESTORE.md))
+**Supabase만 DB에 쓰려면** 루트 `.env.local`에 `VITE_DATA_BACKEND=supabase` 를 넣으세요. ([`src/config.js`](src/config.js) — 이 값이면 `VITE_FIREBASE_*`가 있어도 Firestore 데이터 경로는 사용하지 않습니다.) 이 저장소의 **GitHub Pages** 워크플로([`deploy-gh-pages.yml`](.github/workflows/deploy-gh-pages.yml))는 **`VITE_DATA_BACKEND=supabase`로 고정**하고, `VITE_SUPABASE_URL`·`VITE_SUPABASE_ANON_KEY` **Actions 시크릿**이 있어야 배포가 성공합니다. (로컬을 `auto`+Firebase로 두면 Firestore 쪽이 우선되어 DB가 갈릴 수 있음 — [FIRESTORE.md](FIRESTORE.md).)
 
 ## Supabase CLI (선택)
 
@@ -82,17 +82,15 @@ npm run dev
 
 ## 4. GitHub Pages 배포
 
-워크플로는 **`VITE_DATA_BACKEND=auto`** 로 빌드합니다. **Firestore를 쓰려면** Actions 시크릿에 `VITE_FIREBASE_*` 전부를 추가하세요. Supabase도 쓰려면 `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` 를 추가합니다 (`auto`에서는 Firestore가 데이터에 우선).
+워크플로는 **`VITE_DATA_BACKEND=supabase`** 로 빌드합니다. **필수** Repository secrets: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (빌드 직전 단계에서 비어 있으면 실패). **다른 PC·배포 URL**에서도 같은 Supabase DB를 쓰려면 로컬 `.env.local`에 동일 키를 넣고, 앱의 **“기존 클래스 URL로 연결”** 또는 **“다른 PC용 주소 복사”**로 같은 `?session=`을 쓰면 됩니다.
 
 **브라우저:** 저장소 **Settings → Secrets and variables → Actions → New repository secret** 에 추가합니다.
 
 | Name | Value |
 |------|--------|
-| `VITE_SUPABASE_URL` | (선택) Project URL |
-| `VITE_SUPABASE_ANON_KEY` | (선택) anon public key |
-| `VITE_FIREBASE_API_KEY` 등 | Firestore 사용 시 필수 — [FIRESTORE.md](FIRESTORE.md) 표 참고 |
-
-**Supabase만** 쓰는 배포물을 만들려면 워크플로의 `VITE_DATA_BACKEND`를 `supabase`로 바꾸거나, Firebase 시크릿을 비워 두면 됩니다.
+| `VITE_SUPABASE_URL` | Project URL (필수) |
+| `VITE_SUPABASE_ANON_KEY` | anon public key (필수) |
+| `VITE_FIREBASE_API_KEY` 등 | 이 워크플로는 Firestore 경로를 쓰지 않음. Firestore 전용 배포는 [FIRESTORE.md](FIRESTORE.md) |
 
 **터미널 (GitHub CLI):** 한 번 `gh auth login` 한 뒤, 프로젝트 루트에서:
 

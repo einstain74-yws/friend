@@ -74,6 +74,38 @@ export function buildStudentAccessUrl(students, cloudSessionId = null) {
   return `${originPath}${window.location.search.replace(/\?$/, '')}#r=${r}`;
 }
 
+/**
+ * Supabase/클라우드 세션 ID — 붙여넣은 전체 URL 또는 UUID 문자열만 추출
+ */
+const SESSION_UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function parseSessionIdFromInput(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  const s = raw.trim();
+  if (!s) return null;
+  try {
+    const u = new URL(s);
+    const q = u.searchParams.get('session');
+    if (q) {
+      const t = q.trim();
+      if (SESSION_UUID_RE.test(t)) return t;
+    }
+  } catch {
+    /* ignore */
+  }
+  const m = s.match(
+    /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+  );
+  if (m && SESSION_UUID_RE.test(m[0])) return m[0];
+  return null;
+}
+
+/** 교사·다른 PC에서 열 **같은 클래스** 주소 (`?session=`). 학생용 QR과 동일한 세션. */
+export function buildTeacherClassUrl(cloudSessionId) {
+  return buildStudentAccessUrl([], cloudSessionId);
+}
+
 /** 로드 후 주소창에서 긴 #r= 제거 */
 export function stripRosterFromAddressBar() {
   if (typeof window === 'undefined') return;
