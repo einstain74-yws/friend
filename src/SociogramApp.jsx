@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Users, FileText, Lock, ArrowLeft, ShieldCheck, QrCode, Trash2, Link2, School } from 'lucide-react';
+import { Users, FileText, Lock, ArrowLeft, ShieldCheck, QrCode, Trash2, Link2, School, Home, LogOut } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import StudentManager from './components/StudentManager';
 import SociogramNetwork from './components/SociogramNetwork';
@@ -12,7 +12,7 @@ import {
   stripRosterFromAddressBar,
 } from './utils/rosterUrl';
 import { isCloudEnabled, isSupabaseTeacherPortalEnabled } from './config.js';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext.jsx';
 import * as cloudApi from './api/cloudApi.js';
 
@@ -25,7 +25,8 @@ const LS_SESSION = 'sociogram_cloud_session_id';
  * @param {string | null} [props.classroomLabel] - 대시보드에 학교/학년/반 표시
  */
 export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, classroomLabel = null }) {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const [view, setView] = useState('home'); // 'home' | 'teacher' | 'survey'
   const [showQR, setShowQR] = useState(false);
   const [adminPassword, setAdminPassword] = useState(() => {
@@ -673,13 +674,40 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '1.1rem' }}>학생 설문에 참여하거나 교사용 결과 대시보드로 이동하세요.</p>
           {isSupabaseTeacherPortalEnabled() ? (
-            <p style={{ margin: '0.75rem 0 0 0', fontSize: '0.95rem' }}>
-              <Link to="/auth/login" style={{ color: 'var(--primary)', fontWeight: 600 }}>교사 로그인</Link>
-              {' · '}
-              <Link to="/auth/register" style={{ color: 'var(--primary)', fontWeight: 600 }}>교사 회원가입(학급)</Link>
-              {' · '}
-              <Link to="/teacher" style={{ color: 'var(--primary)', fontWeight: 600 }}>내 학급 목록</Link>
-            </p>
+            <div
+              style={{
+                margin: '0.75rem 0 0 0',
+                fontSize: '0.95rem',
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.5rem 0.75rem',
+              }}
+            >
+              {user ? (
+                <>
+                  <Link to="/teacher" style={{ color: 'var(--primary)', fontWeight: 600 }}>내 학급 목록</Link>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => signOut().then(() => navigate('/'))}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                  >
+                    <LogOut size={16} />
+                    로그아웃
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link to="/auth/login" style={{ color: 'var(--primary)', fontWeight: 600 }}>교사 로그인</Link>
+                  <span style={{ color: 'var(--text-muted)' }}>·</span>
+                  <Link to="/auth/register" style={{ color: 'var(--primary)', fontWeight: 600 }}>교사 회원가입(학급)</Link>
+                  <span style={{ color: 'var(--text-muted)' }}>·</span>
+                  <Link to="/teacher" style={{ color: 'var(--primary)', fontWeight: 600 }}>내 학급 목록</Link>
+                </>
+              )}
+            </div>
           ) : null}
         </div>
 
@@ -752,6 +780,22 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
           </span>
         </h1>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <button
+            type="button"
+            className="btn"
+            style={{ background: 'var(--background)', border: '1px solid var(--border)' }}
+            onClick={() => {
+              if (onLeaveTeacher) {
+                navigate('/', { replace: true });
+              } else {
+                setView('home');
+              }
+            }}
+            title="학생/교사 선택 첫 화면으로 이동"
+          >
+            <Home size={18} />
+            앱 첫화면으로
+          </button>
           <button
             type="button"
             className="btn"
