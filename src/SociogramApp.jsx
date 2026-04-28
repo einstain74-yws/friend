@@ -35,10 +35,10 @@ function isValidRosterList(arr) {
  * @param {string | null} [props.classroomLabel] - 대시보드에 학교/학년/반 표시
  */
 function getInitialView() {
-  if (typeof window === 'undefined') return 'teacher';
+  if (typeof window === 'undefined') return 'home';
   const q = new URLSearchParams(window.location.search).get('session');
   if (q) return 'survey';
-  return 'teacher';
+  return 'home';
 }
 
 export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, classroomLabel = null }) {
@@ -286,7 +286,7 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
       localStorage.setItem(LS_SESSION, id);
       setSessionId(id);
       await loadFromCloud(id);
-      setView('teacher');
+      setView('home');
       return true;
     } catch (e) {
       console.error(e);
@@ -363,7 +363,7 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
           /** 주소창에 `?session=`으로 처음 들어온 경우(학생용 QR·공유 링크) → 설문 화면으로 */
           setView('survey');
         } else {
-          setView('teacher');
+          setView('home');
         }
       } catch (e) {
         console.error(e);
