@@ -15,6 +15,7 @@ import {
   isSupabaseEnabled,
   isLocalApiEnabled,
   isFirestoreEnabled,
+  isSupabaseTeacherPortalEnabled,
   LOCAL_API_BASE,
 } from '../config.js';
 
@@ -415,6 +416,50 @@ export async function getClassroomBySessionId(sessionId) {
     .maybeSingle();
   if (error) throw new Error(error.message);
   return data;
+}
+
+function assertTeacherPortalForProfilePin() {
+  if (!isSupabaseTeacherPortalEnabled()) {
+    throw new Error('교사 계정 PIN은 Supabase 교사 포털 모드에서만 사용됩니다.');
+  }
+}
+
+/**
+ * 로그인 교사의 `profiles.teacher_access_pin`. 없거나 빈 값이면 `null` (앱에서 0000과 동일).
+ * @returns {Promise<string | null>}
+ */
+export async function getProfileTeacherAccessPin() {
+  assertTeacherPortalForProfilePin();
+  const sb = getSb();
+  const {
+    data: { user },
+    error: userErr,
+  } = await sb.auth.getUser();
+  if (userErr) throw new Error(userErr.message);
+  if (!user) throw new Error('로그인이 필요합니다.');
+  const { data, error } = await sb.from('profiles').select('teacher_access_pin').eq('id', user.id).maybeSingle();
+  if (error) throw new Error(error.message);
+  const v = data?.teacher_access_pin;
+  return v != null && String(v).length > 0 ? String(v) : null;
+}
+
+/**
+ * @param {string} pin
+ */
+export async function updateProfileTeacherAccessPin(pin) {
+  assertTeacherPortalForProfilePin();
+  const sb = getSb();
+  const {
+    data: { user },
+    error: userErr,
+  } = await sb.auth.getUser();
+  if (userErr) throw new Error(userErr.message);
+  if (!user) throw new Error('로그인이 필요합니다.');
+  const { error } = await sb
+    .from('profiles')
+    .update({ teacher_access_pin: String(pin ?? '') })
+    .eq('id', user.id);
+  if (error) throw new Error(error.message);
 }
 
 /**

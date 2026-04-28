@@ -141,6 +141,11 @@ npm run gh:secrets
 - **RPC `create_classroom(jsonb)`**: `p_payload`에 `school_name`, `grade`, `class_name`. 응답 JSON에 `session_id`, `classroom_id`.
 - **프론트**: `VITE_SUPABASE`만 사용·Firestore/로컬 API 미사용이면 `isSupabaseTeacherPortalEnabled()`가 true이고 `/auth/login`, `/auth/register`, `/teacher`가 활성화됩니다([`src/config.js`](src/config.js)).
 
+### 교사용 화면 비밀번호 (계정 PIN vs 반별)
+
+- **로그인한 교사(Supabase Auth)**:[`profiles.teacher_access_pin`](supabase/migrations/010_profiles_teacher_access_pin.sql) 한 개가 **그 계정의 모든 학급**에 공통으로 적용됩니다. 앱의「교사용」진입·「교사 접속 비밀번호」변경은 이 값을 씁니다. `NULL`/빈 값이면 **0000**과 동일합니다.
+- **로그인 없이** `?session=` 등으로 클라우드 반만 쓰는 경우: 기존처럼 **`class_sessions.admin_password`**(반마다)와 세션별 로컬 캐시를 사용합니다.
+
 ### 이메일 인증 링크가 localhost:3000 등으로 열릴 때
 
 가입 확인 링크는 [`getAuthCallbackRedirectTo`](src/utils/siteUrl.js)로 **`…/auth/callback`** 을 가리킵니다. Supabase **Redirect URLs**에 그 **전체 URL**이 없으면 세션이 잡히지 않습니다.

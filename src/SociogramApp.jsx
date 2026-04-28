@@ -19,6 +19,8 @@ import * as cloudApi from './api/cloudApi.js';
 const LS_SESSION = 'sociogram_cloud_session_id';
 /** 같은 class session용 로컬 명단 — 서버가 빈 []일 때(저장 실패·로그아웃 직전 등)에만 loadFromCloud에서 복구 */
 const LS_ROSTER_BY_SESSION = 'sociogram_roster_session_';
+/** 비로그인 클라우드 모드: 반마다 교사 비밀번호 캐시(전역 sociogram_admin_pw 와 섞이지 않게) */
+const lsAdminPwSessionKey = (sid) => `sociogram_admin_pw_session_${sid}`;
 
 function isValidRosterList(arr) {
   return (
@@ -156,6 +158,22 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
     };
   }, [sessionId, user?.id]);
 
+  /** Supabase 로그인 교사: 반별 admin_password 대신 profiles.teacher_access_pin */
+  useEffect(() => {
+    if (!isSupabaseTeacherPortalEnabled() || !user?.id) return;
+    let cancelled = false;
+    cloudApi
+      .getProfileTeacherAccessPin()
+      .then((pin) => {
+        if (cancelled) return;
+        setAdminPassword(pin != null && String(pin).length > 0 ? String(pin) : '0000');
+      })
+      .catch((e) => console.warn('교사 계정 PIN 로드 실패', e));
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
+
   const loadFromCloud = useCallback(async (sid) => {
     setCloudRosterHydrated(false);
     try {
@@ -228,14 +246,19 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
         }
       }
       setSurveyHistory(nextHistory);
-      const fromLs = localStorage.getItem('sociogram_admin_pw') || '0000';
-      if (remotePw != null && String(remotePw).length > 0) {
-        setAdminPassword(String(remotePw));
-        localStorage.setItem('sociogram_admin_pw', String(remotePw));
-      } else {
-        setAdminPassword(fromLs);
-        if (fromLs && fromLs !== '0000') {
-          cloudApi.putAdminPassword(sid, fromLs).catch((e) => console.warn('교사 비밀번호를 서버에 맞춤 저장하지 못했습니다.', e));
+      const accountTeacherPin = isSupabaseTeacherPortalEnabled() && user;
+      if (!accountTeacherPin) {
+        const lsKey = lsAdminPwSessionKey(sid);
+        const fromLs = localStorage.getItem(lsKey) || localStorage.getItem('sociogram_admin_pw') || '0000';
+        if (remotePw != null && String(remotePw).length > 0) {
+          setAdminPassword(String(remotePw));
+          localStorage.setItem(lsKey, String(remotePw));
+          localStorage.setItem('sociogram_admin_pw', String(remotePw));
+        } else {
+          setAdminPassword(fromLs);
+          if (fromLs && fromLs !== '0000') {
+            cloudApi.putAdminPassword(sid, fromLs).catch((e) => console.warn('교사 비밀번호를 서버에 맞춤 저장하지 못했습니다.', e));
+          }
         }
       }
       if (window.location.search.includes('session=')) {
@@ -249,7 +272,7 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
       setCloudRosterHydrated(false);
       throw e;
     }
-  }, [initialSessionId]);
+  }, [initialSessionId, user?.id]);
 
   const connectToSession = useCallback(
     async (id, onFailReset) => {
@@ -414,16 +437,28 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
     return () => clearInterval(id);
   }, [view, sessionId, activeHistoryId]);
 
-  /** 탭/앱을 다시 켤 때 서버에 저장된 교사 비밀번호를 가져와 다른 기기에서 바꾼 값과 맞춤 */
+  /** 탭/앱을 다시 켤 때 교사 비밀번호(계정 PIN 또는 반별)를 서버와 맞춤 */
   useEffect(() => {
     if (!isCloudEnabled() || !sessionId) return;
+    const accountTeacherPin = isSupabaseTeacherPortalEnabled() && user;
     const syncPw = () => {
       if (document.visibilityState !== 'visible') return;
+      if (accountTeacherPin) {
+        cloudApi
+          .getProfileTeacherAccessPin()
+          .then((pin) => {
+            setAdminPassword(pin != null && String(pin).length > 0 ? String(pin) : '0000');
+          })
+          .catch((e) => console.warn('교사 계정 PIN 갱신', e));
+        return;
+      }
       cloudApi
         .fetchAdminPassword(sessionId)
         .then((remote) => {
           if (remote != null && String(remote).length > 0) {
             setAdminPassword(String(remote));
+            const lsKey = lsAdminPwSessionKey(sessionId);
+            localStorage.setItem(lsKey, String(remote));
             localStorage.setItem('sociogram_admin_pw', String(remote));
           }
         })
@@ -431,7 +466,7 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
     };
     document.addEventListener('visibilitychange', syncPw);
     return () => document.removeEventListener('visibilitychange', syncPw);
-  }, [sessionId]);
+  }, [sessionId, user?.id]);
 
   const addStudent = (name) => {
     if (!name.trim()) return;
@@ -595,28 +630,45 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
 
   const handleChangePassword = async () => {
     const currentPw = prompt('현재 비밀번호를 입력하세요.');
-    if (currentPw === adminPassword) {
-      const newPw = prompt('새로운 비밀번호를 입력하세요.');
-      if (newPw) {
-        if (isCloudEnabled() && sessionId) {
-          try {
-            await cloudApi.putAdminPassword(sessionId, newPw);
-          } catch (e) {
-            console.error(e);
-            alert(
-              e?.message ||
-                '서버에 비밀번호를 저장하지 못했습니다. Supabase `admin_password` 열(마이그레이션 004)과 네트워크를 확인하세요. 다른 기기에 반영되지 않을 수 있습니다.'
-            );
-            return;
-          }
-        }
-        setAdminPassword(newPw);
-        localStorage.setItem('sociogram_admin_pw', newPw);
-        alert('비밀번호가 변경되었습니다.');
-      }
-    } else if (currentPw !== null) {
-      alert('현재 비밀번호가 틀렸습니다.');
+    if (currentPw !== adminPassword) {
+      if (currentPw !== null) alert('현재 비밀번호가 틀렸습니다.');
+      return;
     }
+    const newPw = prompt('새로운 비밀번호를 입력하세요.');
+    if (!newPw) return;
+    const accountTeacherPin = isSupabaseTeacherPortalEnabled() && user;
+    if (accountTeacherPin) {
+      try {
+        await cloudApi.updateProfileTeacherAccessPin(newPw);
+      } catch (e) {
+        console.error(e);
+        alert(
+          e?.message ||
+            '계정 교사 비밀번호를 저장하지 못했습니다. profiles.teacher_access_pin(마이그레이션 010)과 네트워크를 확인하세요.'
+        );
+        return;
+      }
+      setAdminPassword(newPw);
+      alert('비밀번호가 변경되었습니다. (이 계정의 모든 학급에 동일하게 적용됩니다.)');
+      return;
+    }
+    if (isCloudEnabled() && sessionId) {
+      try {
+        await cloudApi.putAdminPassword(sessionId, newPw);
+      } catch (e) {
+        console.error(e);
+        alert(
+          e?.message ||
+            '서버에 비밀번호를 저장하지 못했습니다. Supabase `admin_password` 열(마이그레이션 004)과 네트워크를 확인하세요. 다른 기기에 반영되지 않을 수 있습니다.'
+        );
+        return;
+      }
+    }
+    setAdminPassword(newPw);
+    const lsKey = lsAdminPwSessionKey(sessionId);
+    localStorage.setItem(lsKey, newPw);
+    localStorage.setItem('sociogram_admin_pw', newPw);
+    alert('비밀번호가 변경되었습니다.');
   };
 
   if (!cloudReady && isCloudEnabled()) {
