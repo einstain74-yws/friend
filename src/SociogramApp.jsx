@@ -34,10 +34,17 @@ function isValidRosterList(arr) {
  * @param {() => void} [props.onLeaveTeacher] - 교사 뷰에서 "학급 목록으로" (로그인 경로)
  * @param {string | null} [props.classroomLabel] - 대시보드에 학교/학년/반 표시
  */
+function getInitialView() {
+  if (typeof window === 'undefined') return 'teacher';
+  const q = new URLSearchParams(window.location.search).get('session');
+  if (q) return 'survey';
+  return 'teacher';
+}
+
 export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, classroomLabel = null }) {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const [view, setView] = useState('home'); // 'home' | 'teacher' | 'survey'
+  const [view, setView] = useState(getInitialView); // 'home' | 'teacher' | 'survey'
   const [showQR, setShowQR] = useState(false);
   const [adminPassword, setAdminPassword] = useState(() => {
     /** 교사 /teacher/session/…: 전역이 다른 기기·다른 반 비번과 섞이지 않게 기본만 두고 loadFromCloud가 채움 */
@@ -99,11 +106,12 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
   const [cloudReady, setCloudReady] = useState(() => {
     if (typeof window === 'undefined') return true;
     if (!isCloudEnabled()) return true;
-    if (initialSessionId) return false;
-    const q = new URLSearchParams(window.location.search).get('session');
-    const stored = localStorage.getItem(LS_SESSION);
-    return !(q || stored);
+    /** 클라우드: 세션 로드 또는 첫 방문 자동 세션 생성이 끝날 때까지 로딩 */
+    return false;
   });
+
+  /** 자동 세션 생성 실패 시에만 기존「클라우드 클래스 연결」폼 표시 */
+  const [showManualSessionConnect, setShowManualSessionConnect] = useState(false);
 
   /** 서버에서 명단을 첫 로드하기 전에는 putRoster를 막음(빈 명단으로 DB를 덮어쓰는 레이스 방지) */
   const [cloudRosterHydrated, setCloudRosterHydrated] = useState(() => {
@@ -278,11 +286,14 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
       localStorage.setItem(LS_SESSION, id);
       setSessionId(id);
       await loadFromCloud(id);
+      setView('teacher');
+      return true;
     } catch (e) {
       console.error(e);
       localStorage.removeItem(LS_SESSION);
       setSessionId(null);
       alert('새 클래스를 만들지 못했습니다. 네트워크와 Supabase 설정을 확인해 주세요.');
+      return false;
     } finally {
       setConnectBusy(false);
       setCloudReady(true);
@@ -310,6 +321,22 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
     stripRosterFromAddressBar();
   }, []);
 
+  /** 첫 방문(저장된 세션 없음): 곧바로 새 클래스를 만들어 교사 분석 화면으로 진입 */
+  useEffect(() => {
+    if (!isCloudEnabled() || sessionId || initialSessionId || showManualSessionConnect) return;
+    let cancelled = false;
+    void (async () => {
+      const ok = await createNewClass();
+      if (cancelled) return;
+      if (!ok) {
+        setShowManualSessionConnect(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, initialSessionId, createNewClass, showManualSessionConnect]);
+
   /** 서버 세션이 있으면 명단·응답을 한곳에서 불러옴 */
   useEffect(() => {
     if (!isCloudEnabled()) {
@@ -319,7 +346,9 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
     const q = new URLSearchParams(window.location.search).get('session');
     const sid = initialSessionId || q || localStorage.getItem(LS_SESSION);
     if (!sid) {
-      setCloudReady(true);
+      if (showManualSessionConnect) {
+        setCloudReady(true);
+      }
       return;
     }
     setSessionId(sid);
@@ -333,6 +362,8 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
         } else if (q) {
           /** 주소창에 `?session=`으로 처음 들어온 경우(학생용 QR·공유 링크) → 설문 화면으로 */
           setView('survey');
+        } else {
+          setView('teacher');
         }
       } catch (e) {
         console.error(e);
@@ -343,7 +374,7 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
         setCloudReady(true);
       }
     })();
-  }, [loadFromCloud, initialSessionId]);
+  }, [loadFromCloud, initialSessionId, showManualSessionConnect]);
 
   /** 클라우드 세션일 때 명단을 서버에 반영 (fetchRoster 이후에만 — 초기 빈 state로 DB를 지우는 것 방지) */
   useEffect(() => {
@@ -607,8 +638,8 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
     );
   }
 
-  /** 클라우드인데 이 브라우저에 `session`이 없을 때: 새로 만들기 또는 기존 URL·UUID로 연결 (로그인 학급 URL 직접진입은 initialSessionId로 스킵) */
-  if (isCloudEnabled() && !sessionId && !initialSessionId) {
+  /** 자동 세션 생성에 실패한 경우에만: 기존 URL·UUID로 연결 또는 새 클래스 (로그인 학급 URL 직접진입은 initialSessionId로 스킵) */
+  if (isCloudEnabled() && !sessionId && !initialSessionId && showManualSessionConnect) {
     return (
       <div
         style={{
