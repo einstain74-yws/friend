@@ -38,7 +38,7 @@ export default function RegisterPage() {
         navigate('/teacher', { replace: true });
       } else {
         alert(
-          '가입 후 로그인 세션이 없습니다. Supabase 대시보드에서 Authentication → Providers → Email → Confirm email 을 끄면, 가입 직후 Supabase에 첫 학급까지 한 번에 완료됩니다.\n\n이메일 확인을 켠 상태라면 메일의 링크를 연 뒤 로그인하고 학급을 추가해 주세요.'
+          '가입 확인 메일을 보냈습니다. 메일의 링크를 눌러 이메일 인증을 마친 뒤 로그인해 주세요.\n\n로그인 후「내 학급」에서 학교·학년·반을 입력해 첫 학급을 만듭니다.'
         );
         navigate('/auth/login', { replace: true });
       }
@@ -73,7 +73,7 @@ export default function RegisterPage() {
       >
         <h1 style={{ fontSize: '1.25rem', margin: '0 0 0.5rem 0' }}>교사 회원가입</h1>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-          제출하면 Supabase에 계정이 만들어지고, 이메일 확인 없이 바로 로그인된 상태로 첫 학급(학교·학년·반)이 함께 저장됩니다. (프로젝트에서 Confirm email 이 꺼져 있어야 합니다.)
+          가입 후 발송되는 메일에서 링크로 이메일을 인증한 다음 로그인합니다. 첫 학급(학교·학년·반)은 로그인 뒤「내 학급」화면에서 만듭니다. (Supabase에서 Confirm email 이 켜져 있어야 위 순서로 동작합니다.)
         </p>
         <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
           <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>이메일</label>
@@ -129,7 +129,7 @@ export default function RegisterPage() {
             </p>
           ) : null}
           <button type="submit" className="btn btn-primary" disabled={busy} style={{ marginTop: '0.5rem', padding: '0.7rem' }}>
-            {busy ? '처리 중…' : '가입 및 첫 학급 만들기'}
+            {busy ? '처리 중…' : '가입하기'}
           </button>
         </form>
         <p style={{ marginTop: '1rem', fontSize: '0.9rem' }}>
