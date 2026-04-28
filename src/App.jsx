@@ -6,6 +6,7 @@ import { isSupabaseTeacherPortalEnabled } from './config.js';
 import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
 import AuthCallbackPage from './pages/AuthCallbackPage.jsx';
+import AuthWelcomePage from './pages/AuthWelcomePage.jsx';
 import TeacherClassList from './pages/TeacherClassList.jsx';
 import TeacherSessionPage from './pages/TeacherSessionPage.jsx';
 import PrivateRoute from './components/PrivateRoute.jsx';
@@ -25,6 +26,14 @@ function AppRoutes() {
       <Route path="/auth/login" element={<LoginPage />} />
       <Route path="/auth/register" element={<RegisterPage />} />
       <Route path="/auth/callback" element={<AuthCallbackPage />} />
+      <Route
+        path="/auth/welcome"
+        element={
+          <PrivateRoute>
+            <AuthWelcomePage />
+          </PrivateRoute>
+        }
+      />
       <Route
         path="/teacher"
         element={

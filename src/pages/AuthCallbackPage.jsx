@@ -12,7 +12,7 @@ export default function AuthCallbackPage() {
 
   useEffect(() => {
     if (!loading && user) {
-      navigate('/teacher', { replace: true });
+      navigate('/auth/welcome', { replace: true });
     }
   }, [loading, user, navigate]);
 
@@ -28,7 +28,7 @@ export default function AuthCallbackPage() {
     if (!sb) return;
     const { data } = await sb.auth.getSession();
     if (data.session?.user) {
-      navigate('/teacher', { replace: true });
+      navigate('/auth/welcome', { replace: true });
     }
   };
 
@@ -58,7 +58,7 @@ export default function AuthCallbackPage() {
           <p style={{ margin: '0 0 1rem 0', color: 'var(--text-main)', lineHeight: 1.55 }}>
             로그인 세션을 확인하지 못했습니다. Supabase 대시보드의 Authentication → URL Configuration에 이 페이지 주소(
             <code style={{ fontSize: '0.8rem' }}>/auth/callback</code>)가 Redirect URLs에 있는지, 그리고 개발 서버 포트(
-            예: 5173)와 메일 링크의 주소가 같은지 확인해 주세요.
+            이 프로젝트는 `npm run dev` 시 기본 포트가 **3000**입니다. 메일 링크의 호스트·포트와 같은지 확인해 주세요.
           </p>
           <button type="button" className="btn btn-primary" style={{ marginBottom: '0.75rem', width: '100%' }} onClick={() => void retrySession()}>
             다시 시도

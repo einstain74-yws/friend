@@ -12,5 +12,10 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     base,
+    /** Supabase 기본 Site URL이 `http://localhost:3000`인 경우가 많아, 메일 인증 링크와 포트를 맞춤 */
+    server: {
+      port: 3000,
+      strictPort: false,
+    },
   }
 })

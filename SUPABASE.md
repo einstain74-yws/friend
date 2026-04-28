@@ -60,7 +60,7 @@
 
 대시보드 **Authentication → Providers → Email** 이 켜져 있어야 회원가입·로그인이 됩니다.
 
-**교사 회원가입(앱 [`RegisterPage`](src/pages/RegisterPage.jsx))** 은 **이메일 인증(Confirm email)** 을 켠 것을 기본으로 합니다. 확인 메일의 링크는 [`/auth/callback`](src/pages/AuthCallbackPage.jsx)으로 돌아온 뒤 자동으로 **「내 학급」**(`/teacher`)으로 이동합니다.
+**교사 회원가입(앱 [`RegisterPage`](src/pages/RegisterPage.jsx))** 은 **이메일 인증(Confirm email)** 을 켠 것을 기본으로 합니다. 확인 메일의 링크는 [`/auth/callback`](src/pages/AuthCallbackPage.jsx)으로 돌아온 뒤 [**가입 환영 화면**](src/pages/AuthWelcomePage.jsx)(`/auth/welcome`)으로 이동하며, 여기서 **「내 학급에서 반 만들기」** 또는 **「교우관계 분석기 첫 화면」** 을 선택합니다.
 
 - 호스팅 프로젝트: **Authentication → Providers → Email → Confirm email** 을 **켜 두세요.**
 - 로컬 `supabase start` 는 [`supabase/config.toml`](supabase/config.toml) 의 `[auth.email] enable_confirmations` 로 맞춥니다(기본 `true`).
@@ -71,13 +71,13 @@
 대시보드 **Authentication → URL Configuration** 에서:
 
 1. **Redirect URLs**에 아래를 **실제로 쓰는 주소와 포트**로 등록합니다.
-   - 로컬(Vite 기본): `http://localhost:5173/auth/callback`
-   - `npm run dev -- --port 3000` 등이면: `http://localhost:3000/auth/callback`
+   - 로컬(이 저장소 [`vite.config.js`](vite.config.js): dev 서버 **기본 포트 3000**): `http://localhost:3000/auth/callback`
+   - 포트를 바꾸거나 5173을 쓰는 경우: `http://localhost:5173/auth/callback` 등 **실제 `npm run dev` 주소**에 맞출 것
    - GitHub Pages 등: `https://<user>.github.io/<repo>/auth/callback` (`VITE_BASE_PATH`와 동일 경로)
 2. 선택: **Site URL**도 로컬 개발 주소와 맞추거나, Redirect URLs만으로 허용 목록을 맞춥니다.
 3. 배포·로컬이 갈릴 때는 `.env.local`에 **`VITE_AUTH_REDIRECT_URL`**(끝 슬래시 없이 origin+경로 prefix, 예: `https://user.github.io/friend`)을 넣으면, 앱이 `…/auth/callback`을 그 prefix에 맞춰 생성합니다. Supabase에도 **같은 전체 콜백 URL**을 Redirect URLs에 추가합니다.
 
-메일 링크가 `localhost:3000`인데 dev 서버는 `5173`이면 **연결 거부**가 납니다. 포트를 통일하거나 Redirect URLs에 둘 다 넣고 `VITE_AUTH_REDIRECT_URL`로 고정하세요.
+메일 링크의 포트·호스트와 `npm run dev`가 다르면 **연결 거부(`ERR_CONNECTION_REFUSED`)** 가 납니다. **택 1:** 이 저장소처럼 Vite를 **3000**에서 띄우고 Supabase **Site URL**을 `http://localhost:3000`에 맞춤. **택 2:** dev를 5173 등 다른 포트로 둘 경우 Supabase Redirect URLs·Site URL을 그에 맞추고 `.env.local`에 `VITE_AUTH_REDIRECT_URL=http://localhost:5173`(슬래시 없이 origin만)을 넣어 [`getAuthCallbackRedirectTo`](src/utils/siteUrl.js)와 메일 링크가 동일해지게 함.
 
 ## 2. API 키 복사
 
@@ -93,11 +93,15 @@
 ```env
 VITE_SUPABASE_URL=https://xxxx.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJ...
+# 선택: 메일 인증 리다이렉트를 고정할 때 (예: 5173 사용 시)
+# VITE_AUTH_REDIRECT_URL=http://localhost:5173
 ```
 
 ```bash
 npm run dev
 ```
+
+개발 서버는 기본 **http://localhost:3000** 입니다([`vite.config.js`](vite.config.js) `server.port`). Supabase **Site URL**도 동일하게 맞추면 이메일 확인 링크가 열리지 않는 문제를 줄일 수 있습니다.
 
 `VITE_SUPABASE_*` 가 없으면 기존처럼 **브라우저 localStorage + URL 해시**만 사용합니다.
 
@@ -139,11 +143,11 @@ npm run gh:secrets
 
 ### 이메일 인증 링크가 localhost:3000 등으로 열릴 때
 
-가입 확인 링크는 [`getAuthCallbackRedirectTo`](src/utils/siteUrl.js)로 **`…/auth/callback`** 을 가리킵니다. Supabase **Redirect URLs**에 그 **전체 URL**(예: `http://localhost:5173/auth/callback`)이 없으면 세션이 잡히지 않습니다.
+가입 확인 링크는 [`getAuthCallbackRedirectTo`](src/utils/siteUrl.js)로 **`…/auth/callback`** 을 가리킵니다. Supabase **Redirect URLs**에 그 **전체 URL**이 없으면 세션이 잡히지 않습니다.
 
 1. **Authentication → URL configuration**
-   - **Site URL**: 배포 주소 예) `https://<github-아이디>.github.io/friend/`
-   - **Redirect URLs**: 배포용 `https://…/friend/auth/callback`, 로컬 `http://localhost:5173/auth/callback`(또는 사용 중인 포트), 필요 시 `http://127.0.0.1:5173/auth/callback`
+   - **Site URL**: 배포 주소 예) `https://<github-아이디>.github.io/friend/` — 로컬은 `http://localhost:3000`(이 저장소 Vite 기본) 또는 `VITE_AUTH_REDIRECT_URL`과 동일한 origin
+   - **Redirect URLs**: 배포용 `https://…/friend/auth/callback`, 로컬 `http://localhost:3000/auth/callback`, 다른 포트를 쓰면 그에 맞는 `/auth/callback` 전체 URL
 2. GitHub Actions 빌드는 `VITE_AUTH_REDIRECT_URL`로 Pages origin을 넣습니다([`deploy-gh-pages.yml`](.github/workflows/deploy-gh-pages.yml)). 콜백은 자동으로 `…/auth/callback`이 붙습니다.
 3. 설정을 바꾼 **뒤**에는 **새로** 회원가입을 보내야 메일 링크가 갱신됩니다(이미 온 메일은 옛 redirect).
 
