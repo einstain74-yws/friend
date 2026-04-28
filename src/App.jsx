@@ -5,6 +5,7 @@ import { AuthProvider } from './context/AuthContext.jsx';
 import { isSupabaseTeacherPortalEnabled } from './config.js';
 import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
+import AuthCallbackPage from './pages/AuthCallbackPage.jsx';
 import TeacherClassList from './pages/TeacherClassList.jsx';
 import TeacherSessionPage from './pages/TeacherSessionPage.jsx';
 import PrivateRoute from './components/PrivateRoute.jsx';
@@ -23,6 +24,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/auth/login" element={<LoginPage />} />
       <Route path="/auth/register" element={<RegisterPage />} />
+      <Route path="/auth/callback" element={<AuthCallbackPage />} />
       <Route
         path="/teacher"
         element={

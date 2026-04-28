@@ -60,11 +60,24 @@
 
 대시보드 **Authentication → Providers → Email** 이 켜져 있어야 회원가입·로그인이 됩니다.
 
-**교사 회원가입(앱 [`RegisterPage`](src/pages/RegisterPage.jsx))** 은 **이메일 인증(Confirm email)** 을 켠 것을 기본으로 합니다. 가입 직후에는 확인 메일의 링크로 인증하고, **로그인한 뒤「내 학급」** 에서 첫 학급을 만듭니다.
+**교사 회원가입(앱 [`RegisterPage`](src/pages/RegisterPage.jsx))** 은 **이메일 인증(Confirm email)** 을 켠 것을 기본으로 합니다. 확인 메일의 링크는 [`/auth/callback`](src/pages/AuthCallbackPage.jsx)으로 돌아온 뒤 자동으로 **「내 학급」**(`/teacher`)으로 이동합니다.
 
 - 호스팅 프로젝트: **Authentication → Providers → Email → Confirm email** 을 **켜 두세요.**
 - 로컬 `supabase start` 는 [`supabase/config.toml`](supabase/config.toml) 의 `[auth.email] enable_confirmations` 로 맞춥니다(기본 `true`).
 - 개발 중에만 인증을 끄면 `signUp` 직후 세션이 생겨, 같은 폼에서 곧바로 `create_classroom` 까지 이어질 수 있습니다.
+
+### 이메일 링크 Redirect URL (필수)
+
+대시보드 **Authentication → URL Configuration** 에서:
+
+1. **Redirect URLs**에 아래를 **실제로 쓰는 주소와 포트**로 등록합니다.
+   - 로컬(Vite 기본): `http://localhost:5173/auth/callback`
+   - `npm run dev -- --port 3000` 등이면: `http://localhost:3000/auth/callback`
+   - GitHub Pages 등: `https://<user>.github.io/<repo>/auth/callback` (`VITE_BASE_PATH`와 동일 경로)
+2. 선택: **Site URL**도 로컬 개발 주소와 맞추거나, Redirect URLs만으로 허용 목록을 맞춥니다.
+3. 배포·로컬이 갈릴 때는 `.env.local`에 **`VITE_AUTH_REDIRECT_URL`**(끝 슬래시 없이 origin+경로 prefix, 예: `https://user.github.io/friend`)을 넣으면, 앱이 `…/auth/callback`을 그 prefix에 맞춰 생성합니다. Supabase에도 **같은 전체 콜백 URL**을 Redirect URLs에 추가합니다.
+
+메일 링크가 `localhost:3000`인데 dev 서버는 `5173`이면 **연결 거부**가 납니다. 포트를 통일하거나 Redirect URLs에 둘 다 넣고 `VITE_AUTH_REDIRECT_URL`로 고정하세요.
 
 ## 2. API 키 복사
 
@@ -126,12 +139,12 @@ npm run gh:secrets
 
 ### 이메일 인증 링크가 localhost:3000 등으로 열릴 때
 
-Supabase는 **Site URL**(기본값이 `http://localhost:3000`인 경우가 많음)로 돌려보냅니다. 아래를 맞추세요.
+가입 확인 링크는 [`getAuthCallbackRedirectTo`](src/utils/siteUrl.js)로 **`…/auth/callback`** 을 가리킵니다. Supabase **Redirect URLs**에 그 **전체 URL**(예: `http://localhost:5173/auth/callback`)이 없으면 세션이 잡히지 않습니다.
 
 1. **Authentication → URL configuration**
    - **Site URL**: 배포 주소 예) `https://<github-아이디>.github.io/friend/`
-   - **Redirect URLs**: 위와 동일 URL, 개발용 `http://localhost:5173/**` (Vite), 필요 시 `http://127.0.0.1:5173/**`
-2. GitHub Actions 빌드는 `VITE_AUTH_REDIRECT_URL`로 동일 Pages URL을 넣습니다([`deploy-gh-pages.yml`](.github/workflows/deploy-gh-pages.yml)). 로컬은 [`getAuthEmailRedirectTo`](src/utils/siteUrl.js)가 현재 탭 주소를 씁니다.
+   - **Redirect URLs**: 배포용 `https://…/friend/auth/callback`, 로컬 `http://localhost:5173/auth/callback`(또는 사용 중인 포트), 필요 시 `http://127.0.0.1:5173/auth/callback`
+2. GitHub Actions 빌드는 `VITE_AUTH_REDIRECT_URL`로 Pages origin을 넣습니다([`deploy-gh-pages.yml`](.github/workflows/deploy-gh-pages.yml)). 콜백은 자동으로 `…/auth/callback`이 붙습니다.
 3. 설정을 바꾼 **뒤**에는 **새로** 회원가입을 보내야 메일 링크가 갱신됩니다(이미 온 메일은 옛 redirect).
 
 ## 보안 (MVP)

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getSupabaseClient } from '../lib/supabaseClient.js';
-import { getAuthEmailRedirectTo } from '../utils/siteUrl.js';
+import { getAuthCallbackRedirectTo } from '../utils/siteUrl.js';
 import * as cloudApi from '../api/cloudApi.js';
 
 export default function RegisterPage() {
@@ -25,11 +25,11 @@ export default function RegisterPage() {
     try {
       const sb = getSupabaseClient();
       if (!sb) throw new Error('Supabase가 설정되지 않았습니다.');
-      const redirectTo = getAuthEmailRedirectTo();
+      const redirectTo = getAuthCallbackRedirectTo();
       const { data, error: signErr } = await sb.auth.signUp({
         email: email.trim(),
         password,
-        options: redirectTo ? { emailRedirectTo: redirectTo } : undefined,
+        options: { emailRedirectTo: redirectTo },
       });
       if (signErr) throw signErr;
 

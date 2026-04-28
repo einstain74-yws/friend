@@ -20,3 +20,18 @@ export function getAuthEmailRedirectTo() {
   if (base) return `${base}/`;
   return `${window.location.origin}/`;
 }
+
+/**
+ * 이메일 확인(Confirm) 링크가 돌아올 전용 경로. Supabase Redirect URLs에 이 전체 URL을 등록할 것.
+ * 예: http://localhost:5173/auth/callback, https://user.github.io/friend/auth/callback
+ */
+export function getAuthCallbackRedirectTo() {
+  const explicit = import.meta.env.VITE_AUTH_REDIRECT_URL;
+  if (typeof explicit === 'string' && explicit.trim().startsWith('http')) {
+    return `${explicit.replace(/\/$/, '')}/auth/callback`;
+  }
+  if (typeof window === 'undefined') return '';
+  const base = getAppOriginBase();
+  if (base) return `${base}/auth/callback`;
+  return `${window.location.origin}/auth/callback`;
+}

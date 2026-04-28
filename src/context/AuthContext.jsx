@@ -24,21 +24,29 @@ export function AuthProvider({ children }) {
       setLoading(false);
       return;
     }
-    sb.auth
-      .getSession()
-      .then(({ data: { session: s } }) => {
-        setSession(s);
-        setUser(s?.user ?? null);
-      })
-      .finally(() => setLoading(false));
+    let initialLoadComplete = false;
+    const completeInitialLoad = () => {
+      if (initialLoadComplete) return;
+      initialLoadComplete = true;
+      setLoading(false);
+    };
 
     const {
       data: { subscription },
-    } = sb.auth.onAuthStateChange((_event, s) => {
+    } = sb.auth.onAuthStateChange((event, s) => {
       setSession(s);
       setUser(s?.user ?? null);
+      if (event === 'INITIAL_SESSION') {
+        completeInitialLoad();
+      }
     });
-    return () => subscription.unsubscribe();
+
+    const fallbackTimer = window.setTimeout(completeInitialLoad, 5000);
+
+    return () => {
+      window.clearTimeout(fallbackTimer);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signOut = async () => {
