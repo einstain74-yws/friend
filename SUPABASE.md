@@ -58,8 +58,13 @@
 
 ## 1-1. 이메일 로그인 (Auth)
 
-대시보드 **Authentication → Providers → Email** 이 켜져 있어야 회원가입·로그인이 됩니다.  
-테스트 중 이메일 확인이 번거롭다면 **Authentication → Providers → Email → Confirm email** 을 끄면 가입 직후 바로 로그인할 수 있습니다(운영 환경에서는 켜 두는 것을 권장).
+대시보드 **Authentication → Providers → Email** 이 켜져 있어야 회원가입·로그인이 됩니다.
+
+**교사 회원가입(앱 [`RegisterPage`](src/pages/RegisterPage.jsx))** 은 **이메일 확인 없이** 가입 직후 세션이 발급되는 흐름을 사용합니다. 호스팅 프로젝트에서 반드시 **Authentication → Providers → Email → Confirm email** 을 **끄세요.** 이렇게 해야 `signUp` 직후 `create_classroom` RPC가 로그인된 사용자로 실행되어 첫 학급 데이터가 Supabase에 바로 생성됩니다.
+
+- 로컬 `supabase start` 는 [`supabase/config.toml`](supabase/config.toml) 의 `[auth.email] enable_confirmations = false` 로 동일하게 맞춰져 있습니다.
+- 이메일 확인을 켜 두면 가입 후 세션이 없어 로그인 화면으로만 안내되며, 첫 학급은 로그인 뒤 따로 만들어야 합니다.
+- 공개 서비스에서는 이메일 미검증 가입에 따른 남용 가능성을 감안해 CAPTCHA·모니터링 등을 검토하세요.
 
 ## 2. API 키 복사
 
