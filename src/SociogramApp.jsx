@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Users, FileText, Lock, ArrowLeft, ShieldCheck, QrCode, Trash2, School, Home, LogOut } from 'lucide-react';
+import { Users, FileText, Lock, ArrowLeft, ShieldCheck, QrCode, Trash2, School, Home, LogOut, Copy } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import StudentManager from './components/StudentManager';
 import SociogramNetwork from './components/SociogramNetwork';
@@ -48,6 +48,7 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
   const navigate = useNavigate();
   const [view, setView] = useState(getInitialView); // 'home' | 'teacher' | 'survey'
   const [showQR, setShowQR] = useState(false);
+  const [qrCopyFeedback, setQrCopyFeedback] = useState('');
   const [adminPassword, setAdminPassword] = useState(() => {
     /** 교사 /teacher/session/…: 전역이 다른 기기·다른 반 비번과 섞이지 않게 기본만 두고 loadFromCloud가 채움 */
     if (initialSessionId && isCloudEnabled()) return '0000';
@@ -554,6 +555,28 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
     ? students
     : (surveyHistory.find(h => h.id === activeHistoryId)?.students || []);
 
+  const studentAccessUrl = useMemo(
+    () => buildStudentAccessUrl(students, isCloudEnabled() && sessionId ? sessionId : null),
+    [students, sessionId],
+  );
+
+  const copyStudentSurveyLink = useCallback(async () => {
+    const url = studentAccessUrl;
+    if (!url) return;
+    setQrCopyFeedback('');
+    try {
+      await navigator.clipboard.writeText(url);
+      setQrCopyFeedback('복사되었습니다.');
+      window.setTimeout(() => setQrCopyFeedback(''), 2500);
+    } catch {
+      try {
+        window.prompt('주소 전체를 선택한 뒤 복사(Ctrl+C)해 주세요:', url);
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [studentAccessUrl]);
+
   const relationships = useMemo(() => {
     const rels = [];
     activeResponses.forEach(r => {
@@ -835,35 +858,99 @@ export function SociogramApp({ initialSessionId = null, onLeaveTeacher = null, c
         </button>
 
         {showQR && (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }} onClick={() => setShowQR(false)}>
-            <div style={{ background: 'white', padding: '2rem 2.25rem', borderRadius: '24px', display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: 'var(--shadow-xl)', gap: '1rem', textAlign: 'center', maxWidth: '360px' }} onClick={e => e.stopPropagation()}>
+          <div
+            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.4)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }}
+            onClick={() => {
+              setQrCopyFeedback('');
+              setShowQR(false);
+            }}
+          >
+            <div
+              style={{
+                background: 'white',
+                padding: '2rem 2.25rem',
+                borderRadius: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                boxShadow: 'var(--shadow-xl)',
+                gap: '1rem',
+                textAlign: 'center',
+                maxWidth: 'min(92vw, 440px)',
+                width: '100%',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
               <h2 style={{ margin: 0, color: 'var(--text-main)', fontSize: '1.25rem' }}>학생 접속용 QR</h2>
               {students.length === 0 && !(isCloudEnabled() && sessionId) ? (
                 <p style={{ margin: 0, color: 'var(--danger)', fontSize: '0.9rem', lineHeight: 1.5 }}>
                   먼저 <strong>교사용</strong>에서 명단을 등록한 뒤, 이 화면을 다시 여 주세요.
                 </p>
               ) : (
-                <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.85rem', lineHeight: 1.4 }}>
-                  {isCloudEnabled() && sessionId ? (
-                    <>
-                      QR에는 학급 주소(세션)만 담깁니다. 교사용에서 바꾼 명단은 서버에 저장되며, 학생이 이 QR로 들어가면 항상 그때의 명단이 표시됩니다.
-                    </>
-                  ) : (
-                    '스마트폰 카메라로 QR을 스캔하면 설문으로 이동합니다.'
-                  )}
-                </p>
+                <>
+                  <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.85rem', lineHeight: 1.4 }}>
+                    {isCloudEnabled() && sessionId ? (
+                      <>
+                        QR에는 학급 주소(세션)만 담깁니다. 교사용에서 바꾼 명단은 서버에 저장되며, 학생이 이 QR로 들어가면 항상 그때의 명단이 표시됩니다.
+                      </>
+                    ) : (
+                      '스마트폰 카메라로 QR을 스캔하면 설문으로 이동합니다.'
+                    )}
+                  </p>
+                  <p style={{ margin: 0, color: 'var(--text-muted)', fontSize: '0.8rem', lineHeight: 1.45 }}>
+                    카카오톡 등에서는 링크가 잘릴 수 있어 QR을 권장합니다. 링크로 보낼 때는 아래 주소 <strong>전체</strong>를 복사하세요.
+                  </p>
+                </>
               )}
               <div style={{ padding: '1rem', background: 'white', borderRadius: '16px', border: '1px solid var(--border)', lineHeight: 0 }}>
-                <QRCodeSVG
-                  value={buildStudentAccessUrl(students, isCloudEnabled() && sessionId ? sessionId : null)}
-                  size={280}
-                  level="L"
-                  includeMargin
-                />
+                <QRCodeSVG value={studentAccessUrl} size={280} level="L" includeMargin />
               </div>
+              {students.length > 0 || (isCloudEnabled() && sessionId) ? (
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '0.5rem', alignItems: 'stretch' }}>
+                  <label htmlFor="student-survey-link" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)', textAlign: 'left' }}>
+                    접속 링크 (QR과 동일)
+                  </label>
+                  <textarea
+                    id="student-survey-link"
+                    readOnly
+                    value={studentAccessUrl}
+                    rows={3}
+                    style={{
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      fontSize: '0.75rem',
+                      lineHeight: 1.4,
+                      padding: '0.6rem 0.75rem',
+                      borderRadius: '10px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--background)',
+                      color: 'var(--text-main)',
+                      resize: 'vertical',
+                      fontFamily: 'ui-monospace, monospace',
+                    }}
+                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      onClick={() => void copyStudentSurveyLink()}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', padding: '0.5rem 1rem' }}
+                    >
+                      <Copy size={16} />
+                      링크 복사
+                    </button>
+                    {qrCopyFeedback ? (
+                      <span style={{ fontSize: '0.85rem', color: 'var(--primary)', fontWeight: 600 }}>{qrCopyFeedback}</span>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
               <button
                 type="button"
-                onClick={() => setShowQR(false)}
+                onClick={() => {
+                  setQrCopyFeedback('');
+                  setShowQR(false);
+                }}
                 className="btn btn-primary"
                 style={{ width: '100%', padding: '0.75rem' }}
               >

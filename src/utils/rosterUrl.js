@@ -56,22 +56,36 @@ export function decodeRosterFromLocation() {
 }
 
 /**
+ * Vite `import.meta.env.BASE_URL`과 동일한 SPA 공개 루트 (학생 링크·QR).
+ * 현재 브라우저 pathname(예: /teacher/session/…)과 무관하게 설문 진입 가능한 주소를 만든다.
+ */
+export function getSpaAppPublicHref() {
+  if (typeof window === 'undefined') return '';
+  return new URL(import.meta.env.BASE_URL || '/', window.location.origin).href;
+}
+
+/**
  * 학생 설문 접속 주소
  * @param {Array} students
  * @param {string|null} cloudSessionId 서버 연동 시 짧은 ?session= 만 사용
  */
 export function buildStudentAccessUrl(students, cloudSessionId = null) {
   if (typeof window === 'undefined') return '';
-  const originPath = `${window.location.origin}${window.location.pathname}`;
+  const root = getSpaAppPublicHref();
   if (cloudSessionId) {
-    const u = new URL(originPath);
+    const u = new URL(root);
     u.searchParams.set('session', cloudSessionId);
     return u.toString();
   }
-  if (!students?.length) return `${originPath}${window.location.search}`;
+  const u = new URL(root);
+  if (window.location.search) {
+    u.search = new URLSearchParams(window.location.search).toString();
+  }
+  if (!students?.length) return u.toString();
   const r = encodeRosterParam(students);
-  if (!r) return `${originPath}${window.location.search}`;
-  return `${originPath}${window.location.search.replace(/\?$/, '')}#r=${r}`;
+  if (!r) return u.toString();
+  u.hash = `r=${r}`;
+  return u.toString();
 }
 
 /**

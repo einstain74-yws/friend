@@ -11,35 +11,44 @@ function parseQ9(raw) {
   return Number.isFinite(n) ? n : undefined;
 }
 
-/** 설문 9번(친화성) 점수 → 노드 반경·색 (리커트 1~5 가정) */
+/** 설문 9번(친화성) 점수 → 노드 색만 (리커트 1~5). 노드 크기는 통일해 화살표가 가려지지 않게 함 */
 function getAgreeablenessStyle(q9) {
-  const fallback = {
-    outerR: 6,
-    innerR: 5,
-    ring: '#cbd5e1',
-    fill: '#64748b',
-  };
+  const fallback = { ring: '#cbd5e1', fill: '#64748b' };
   const q = parseQ9(q9);
   if (q === undefined) {
     return fallback;
   }
   if (q > 5) {
-    return { outerR: 18, innerR: 15, ring: '#FDE047', fill: '#EAB308' };
+    return { ring: '#FDE047', fill: '#EAB308' };
   }
   if (q < 1) {
-    return { outerR: 6, innerR: 5, ring: '#C084FC', fill: '#7E22CE' };
+    return { ring: '#C084FC', fill: '#7E22CE' };
   }
   if (q >= 4 && q <= 5) {
-    return { outerR: 18, innerR: 15, ring: '#FDE047', fill: '#EAB308' };
+    return { ring: '#FDE047', fill: '#EAB308' };
   }
   if (q > 2 && q < 4) {
-    return { outerR: 11, innerR: 9, ring: '#93C5FD', fill: '#2563EB' };
+    return { ring: '#93C5FD', fill: '#2563EB' };
   }
   if (q >= 1 && q <= 2) {
-    return { outerR: 6, innerR: 5, ring: '#C084FC', fill: '#7E22CE' };
+    return { ring: '#C084FC', fill: '#7E22CE' };
   }
   return fallback;
 }
+
+/** 명단에 "3 홍길동", "12. 김철수"처럼 붙은 번호만 제거하고 이름만 표시 */
+function displayStudentName(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  const stripped = s
+    .replace(/^\d{1,3}\s*[.)]\s*/u, '')
+    .replace(/^\d{1,3}\s+/u, '')
+    .trim();
+  return stripped || s;
+}
+
+/** react-force-graph-2d: 반지름 ≈ sqrt(val)*nodeRelSize — 전 학생 동일 */
+const UNIFORM_NODE_VAL = 36;
 
 /**
  * 명단만으로는 부족할 때(과거 스냅샷 누락 등) 응답·관계에 등장하는 id도 노드로 포함
@@ -148,13 +157,12 @@ export default function SociogramNetwork({ students, relationships, responses = 
 
     const nodes = merged.map((s) => {
       const q9 = q9ByAuthor[String(s.id)];
-      const st = getAgreeablenessStyle(q9);
+      const label = displayStudentName(s.name);
       return {
         id: s.id,
-        name: s.name,
+        name: label || s.name,
         q9,
-        /* 기본 노드 반경: sqrt(val)*nodeRelSize ≈ outerR */
-        val: Math.max(st.outerR * st.outerR, 1),
+        val: UNIFORM_NODE_VAL,
       };
     });
 
@@ -365,7 +373,7 @@ export default function SociogramNetwork({ students, relationships, responses = 
               fontSize: '0.7rem',
             }}
           >
-            9번 친화성 (노드)
+            9번 친화성 (노드 색)
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', fontSize: '0.68rem' }}>
             <span>
@@ -380,26 +388,27 @@ export default function SociogramNetwork({ students, relationships, responses = 
                   verticalAlign: 'middle',
                 }}
               />{' '}
-              큼 · 노랑 4~5점
+              노랑 · 4~5점
             </span>
             <span>
               <span
                 style={{
-                  width: 9,
-                  height: 9,
+                  width: 10,
+                  height: 10,
                   borderRadius: '50%',
                   background: '#2563eb',
+                  border: '1px solid #93C5FD',
                   display: 'inline-block',
                   verticalAlign: 'middle',
                 }}
               />{' '}
-              중간 · 파랑 2초과~4미만
+              파랑 · 3점(2초과~4미만)
             </span>
             <span>
               <span
                 style={{
-                  width: 7,
-                  height: 7,
+                  width: 10,
+                  height: 10,
                   borderRadius: '50%',
                   background: '#7E22CE',
                   border: '1px solid #C084FC',
@@ -407,20 +416,21 @@ export default function SociogramNetwork({ students, relationships, responses = 
                   verticalAlign: 'middle',
                 }}
               />{' '}
-              작음 · 보라 1~2점
+              보라 · 1~2점
             </span>
             <span>
               <span
                 style={{
-                  width: 6,
-                  height: 6,
+                  width: 10,
+                  height: 10,
                   borderRadius: '50%',
                   background: '#64748b',
+                  border: '1px solid #cbd5e1',
                   display: 'inline-block',
                   verticalAlign: 'middle',
                 }}
               />{' '}
-              작음 · 회색 미응답
+              회색 · 미응답
             </span>
           </div>
         </div>
